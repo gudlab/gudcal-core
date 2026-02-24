@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   # ─── PostgreSQL Database ───────────────────────────────────
   db:
@@ -28,29 +26,30 @@ services:
     ports:
       - "3000:3000"
     environment:
-      # App
-      NEXT_PUBLIC_APP_URL: http://localhost:3000
-      NEXT_PUBLIC_IS_SELF_HOSTED: "true"
-
-      # Database (points to the db service above)
+      # Database — auto-wired to the PostgreSQL service above
       DATABASE_URL: postgres://gudcal:gudcal_password@db:5432/gudcal
 
-      # Auth — generate with: openssl rand -base64 32
-      AUTH_SECRET: ${AUTH_SECRET:?Set AUTH_SECRET in .env}
+      # App
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+      NEXT_PUBLIC_IS_SELF_HOSTED: "true"
 
-      # Google OAuth
+      # Auth — auto-generated if empty (see docker-entrypoint.sh)
+      AUTH_SECRET: ${AUTH_SECRET:-}
+      AUTH_TRUST_HOST: "true"
+
+      # Google OAuth — demo values used if empty (login won't work)
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
 
-      # Email
+      # Email — demo value used if empty (emails won't send)
       RESEND_API_KEY: ${RESEND_API_KEY:-}
 
-      # Calendar integration
+      # Calendar integration (optional)
       GOOGLE_CALENDAR_CLIENT_ID: ${GOOGLE_CALENDAR_CLIENT_ID:-}
       GOOGLE_CALENDAR_CLIENT_SECRET: ${GOOGLE_CALENDAR_CLIENT_SECRET:-}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
 
-      # Cron
+      # Cron (auto-generated if empty)
       CRON_SECRET: ${CRON_SECRET:-}
     depends_on:
       db:

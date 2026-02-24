@@ -1,4 +1,4 @@
-import { EventLocationKind } from "@/app/generated/prisma/client";
+import { EventLocationKind, EventVisibility } from "@/app/generated/prisma/client";
 import { z } from "zod";
 
 export const eventTypeSchema = z.object({
@@ -22,6 +22,7 @@ export const eventTypeSchema = z.object({
   minimumNotice: z.number().int().min(0),
   requiresConfirmation: z.boolean(),
   isActive: z.boolean().optional(),
+  visibility: z.nativeEnum(EventVisibility).optional(),
   availabilityId: z.string().optional().nullable(),
   customQuestions: z
     .array(
@@ -54,6 +55,7 @@ export const defaultEventTypeValues: EventTypeFormData = {
   minimumNotice: 120,
   requiresConfirmation: false,
   isActive: true,
+  visibility: EventVisibility.PUBLIC,
   availabilityId: null,
   customQuestions: null,
 };

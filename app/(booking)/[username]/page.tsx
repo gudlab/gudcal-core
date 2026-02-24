@@ -59,6 +59,7 @@ export default async function UserProfilePage({
     where: {
       userId: user.id,
       isActive: true,
+      visibility: "PUBLIC",
     },
     select: {
       id: true,

@@ -22,7 +22,13 @@ const nextConfig = {
       },
     ],
   },
-  serverExternalPackages: ["@prisma/client"],
+  serverExternalPackages: ["@prisma/client", "@prisma/client-runtime-utils"],
+
+  // Include font files in serverless function bundles (Vercel)
+  // so the OG image route can read them via fs.readFile
+  outputFileTracingIncludes: {
+    "/api/og": ["./assets/fonts/**/*"],
+  },
 };
 
 export default withContentlayer(nextConfig);

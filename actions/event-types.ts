@@ -48,6 +48,7 @@ export async function createEventType(data: EventTypeFormData) {
         minimumNotice: validated.minimumNotice,
         requiresConfirmation: validated.requiresConfirmation,
         isActive: validated.isActive ?? true,
+        visibility: validated.visibility ?? "PUBLIC",
         availabilityId: validated.availabilityId,
         customQuestions: validated.customQuestions ?? undefined,
       },
@@ -115,6 +116,7 @@ export async function updateEventType(
         minimumNotice: validated.minimumNotice,
         requiresConfirmation: validated.requiresConfirmation,
         isActive: validated.isActive ?? existing.isActive,
+        visibility: validated.visibility ?? existing.visibility,
         availabilityId: validated.availabilityId,
         customQuestions: validated.customQuestions ?? undefined,
       },
@@ -196,6 +198,33 @@ export async function toggleEventType(
   }
 }
 
+export async function getUserEventTypes() {
+  try {
+    const session = await auth();
+    const userId = session?.user?.id;
+    if (!userId) {
+      return [];
+    }
+
+    const eventTypes = await prisma.eventType.findMany({
+      where: { userId },
+      select: {
+        id: true,
+        title: true,
+        slug: true,
+        color: true,
+        isActive: true,
+        visibility: true,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return eventTypes;
+  } catch {
+    return [];
+  }
+}
+
 export async function duplicateEventType(eventTypeId: string) {
   try {
     const session = await auth();
@@ -241,6 +270,7 @@ export async function duplicateEventType(eventTypeId: string) {
         minimumNotice: existing.minimumNotice,
         requiresConfirmation: existing.requiresConfirmation,
         isActive: false, // Start as inactive
+        visibility: existing.visibility,
         availabilityId: existing.availabilityId,
         customQuestions: existing.customQuestions ?? undefined,
       },

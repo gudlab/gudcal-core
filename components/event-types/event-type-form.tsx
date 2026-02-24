@@ -3,7 +3,7 @@
 import { useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { EventLocationKind, type EventType } from "@/app/generated/prisma/client";
+import { EventLocationKind, EventVisibility, type EventType } from "@/app/generated/prisma/client";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
@@ -87,6 +87,7 @@ export function EventTypeForm({ eventType }: EventTypeFormProps) {
           minimumNotice: eventType.minimumNotice,
           requiresConfirmation: eventType.requiresConfirmation,
           isActive: eventType.isActive,
+          visibility: eventType.visibility,
           availabilityId: eventType.availabilityId,
           customQuestions: eventType.customQuestions as any,
         }
@@ -303,6 +304,33 @@ export function EventTypeForm({ eventType }: EventTypeFormProps) {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Visibility</Label>
+              <Select
+                value={form.watch("visibility") ?? EventVisibility.PUBLIC}
+                onValueChange={(v) =>
+                  form.setValue("visibility", v as EventVisibility)
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={EventVisibility.PUBLIC}>
+                    Public
+                  </SelectItem>
+                  <SelectItem value={EventVisibility.PRIVATE}>
+                    Private
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-sm text-muted-foreground">
+                {form.watch("visibility") === EventVisibility.PRIVATE
+                  ? "Only accessible via direct link — hidden from your public profile"
+                  : "Visible on your public profile page"}
+              </p>
             </div>
 
             <div className="flex items-center justify-between rounded-lg border p-4">

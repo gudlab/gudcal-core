@@ -1,14 +1,14 @@
+import { readFile } from "node:fs/promises"
+import { join } from "node:path"
+
 import { ImageResponse } from "next/og"
 
 import { ogImageSchema } from "@/lib/validations/og"
 
-const interRegular = fetch(
-  new URL("../../../assets/fonts/Inter-Regular.ttf", import.meta.url)
-).then((res) => res.arrayBuffer())
-
-const interBold = fetch(
-  new URL("../../../assets/fonts/CalSans-SemiBold.ttf", import.meta.url)
-).then((res) => res.arrayBuffer())
+// Read font files from disk (avoids webpack URL transform issues in standalone Docker)
+const fontDir = join(process.cwd(), "assets", "fonts")
+const interRegular = readFile(join(fontDir, "Inter-Regular.ttf"))
+const interBold = readFile(join(fontDir, "CalSans-SemiBold.ttf"))
 
 
 export async function GET(req: Request) {

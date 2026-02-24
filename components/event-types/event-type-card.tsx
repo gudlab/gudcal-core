@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { type EventType } from "@/app/generated/prisma/client";
+import { EventVisibility, type EventType } from "@/app/generated/prisma/client";
 import { toast } from "sonner";
 
 import {
@@ -104,6 +104,9 @@ export function EventTypeCard({
           </Link>
           {!eventType.isActive && (
             <Badge variant="secondary">Inactive</Badge>
+          )}
+          {eventType.isActive && eventType.visibility === EventVisibility.PRIVATE && (
+            <Badge variant="outline">Private</Badge>
           )}
         </div>
         <p className="text-sm text-muted-foreground">
