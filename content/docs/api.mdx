@@ -1,0 +1,627 @@
+---
+title: API Reference
+description: Complete REST API documentation for GudCal. Create event types, manage availability, handle bookings, and run your entire scheduling operation programmatically.
+---
+
+GudCal provides a comprehensive REST API that lets users and AI agents manage their entire scheduling operation without touching the web interface. From creating event types to managing availability and handling bookings — everything is available via API.
+
+## Base URL
+
+```
+https://your-gudcal-instance.com/api/v1
+```
+
+All authenticated endpoints are under the `/api/v1` namespace. Public endpoints (availability queries, booking creation by guests) use the legacy `/api` namespace.
+
+## Authentication
+
+API requests to private endpoints require an API key. Generate one from **Dashboard &gt; Settings &gt; API Keys**, or use the `POST /api/v1/api-keys` endpoint.
+
+API keys use the `gck_` prefix and are passed via the `Authorization` header:
+
+```bash
+curl -H "Authorization: Bearer gck_your_api_key_here" \
+  https://gudcal.com/api/v1/me
+```
+
+### Getting Your First API Key
+
+1. Register at `https://gudcal.com/register` (email/password or Google OAuth)
+2. Go to **Dashboard &gt; Settings &gt; API Keys**
+3. Click **Create API Key**, give it a name, and copy the key
+4. The full key is only shown once — store it securely
+5. Hand this key to your AI agent — from here on, the agent can manage everything
+
+### Error Responses
+
+All endpoints return errors in a consistent format:
+
+```json
+{
+  "error": "Description of what went wrong"
+}
+```
+
+Common HTTP status codes:
+
+| Code | Meaning |
+|---|---|
+| `200` | Success |
+| `201` | Created |
+| `400` | Bad request (invalid input) |
+| `401` | Unauthorized (missing or invalid API key) |
+| `404` | Resource not found |
+| `409` | Conflict (e.g. duplicate slug) |
+| `429` | Rate limited |
+
+---
+
+## Profile
+
+### Get Profile
+
+```
+GET /api/v1/me
+```
+
+Returns the authenticated user's profile.
+
+**Response:**
+
+```json
+{
+  "id": "clx...",
+  "name": "Tim Uzua",
+  "email": "tim@gudcal.com",
+  "username": "tim",
+  "timezone": "America/New_York",
+  "bio": "Building GudCal",
+  "weekStart": 1
+}
+```
+
+### Update Profile
+
+```
+PUT /api/v1/me
+```
+
+Update profile fields. All fields are optional — only provided fields are updated.
+
+**Body:**
+
+```json
+{
+  "name": "Tim Uzua",
+  "username": "tim",
+  "timezone": "Africa/Lagos",
+  "bio": "Building open-source scheduling",
+  "weekStart": 1
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `name` | string | Display name |
+| `username` | string | Unique username (letters, numbers, hyphens, underscores) |
+| `timezone` | string | IANA timezone (e.g. `America/New_York`) |
+| `bio` | string | Short bio (max 500 chars) |
+| `weekStart` | number | Week start day (0=Sunday, 1=Monday, ...6=Saturday) |
+
+---
+
+## Event Types
+
+### List Event Types
+
+```
+GET /api/v1/event-types
+```
+
+Returns all event types for the authenticated user (including inactive ones).
+
+**Response:**
+
+```json
+[
+  {
+    "id": "clx...",
+    "title": "30-Minute Call",
+    "slug": "30-min-call",
+    "description": "A quick intro call",
+    "duration": 30,
+    "locationType": "GOOGLE_MEET",
+    "isActive": true,
+    "requiresConfirmation": false,
+    "bufferBefore": 5,
+    "bufferAfter": 5,
+    "minimumNotice": 120,
+    "maxBookingsPerDay": null,
+    "slotInterval": null,
+    "color": "#0069FF",
+    "availability": { "id": "clx...", "name": "Working Hours" },
+    "bookingCount": 42
+  }
+]
+```
+
+### Get Event Type
+
+```
+GET /api/v1/event-types/:id
+```
+
+Returns a single event type with booking count.
+
+### Create Event Type
+
+```
+POST /api/v1/event-types
+```
+
+**Body:**
+
+```json
+{
+  "title": "Discovery Call",
+  "slug": "discovery-call",
+  "description": "Let's explore how we can work together",
+  "duration": 45,
+  "locationType": "GOOGLE_MEET",
+  "requiresConfirmation": false,
+  "bufferBefore": 5,
+  "bufferAfter": 10,
+  "minimumNotice": 240,
+  "maxBookingsPerDay": 5
+}
+```
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `title` | string | yes | Event type title |
+| `slug` | string | yes | URL slug (lowercase, hyphens only) |
+| `description` | string | no | Description |
+| `duration` | number | no | Duration in minutes (default: 30) |
+| `locationType` | enum | no | `IN_PERSON`, `GOOGLE_MEET`, `ZOOM`, `PHONE`, `CUSTOM` |
+| `locationValue` | string | no | Address, phone, or custom URL |
+| `isActive` | boolean | no | Whether active (default: true) |
+| `requiresConfirmation` | boolean | no | Require manual confirmation (default: false) |
+| `bufferBefore` | number | no | Buffer before in minutes (default: 0) |
+| `bufferAfter` | number | no | Buffer after in minutes (default: 0) |
+| `minimumNotice` | number | no | Minimum advance notice in minutes (default: 120) |
+| `maxBookingsPerDay` | number | no | Max bookings per day (null = unlimited) |
+| `slotInterval` | number | no | Custom slot interval in minutes |
+| `color` | string | no | Hex color (default: #0069FF) |
+| `availabilityId` | string | no | Link to an availability schedule |
+
+**Response (201):**
+
+```json
+{
+  "id": "clx...",
+  "title": "Discovery Call",
+  "slug": "discovery-call",
+  "duration": 45,
+  "isActive": true,
+  "bookingUrl": "https://gudcal.com/tim/discovery-call"
+}
+```
+
+### Update Event Type
+
+```
+PUT /api/v1/event-types/:id
+```
+
+All fields are optional. Only provided fields are updated.
+
+**Body:**
+
+```json
+{
+  "title": "Updated Call",
+  "duration": 60,
+  "isActive": false
+}
+```
+
+### Delete Event Type
+
+```
+DELETE /api/v1/event-types/:id
+```
+
+Deletes the event type and all associated bookings.
+
+---
+
+## Availability
+
+### List Availability Schedules
+
+```
+GET /api/v1/availability
+```
+
+Returns all availability schedules with their weekly rules and date overrides.
+
+**Response:**
+
+```json
+[
+  {
+    "id": "clx...",
+    "name": "Working Hours",
+    "timezone": "America/New_York",
+    "isDefault": true,
+    "rules": [
+      { "dayOfWeek": 1, "startTime": "09:00", "endTime": "17:00" },
+      { "dayOfWeek": 2, "startTime": "09:00", "endTime": "17:00" },
+      { "dayOfWeek": 3, "startTime": "09:00", "endTime": "17:00" },
+      { "dayOfWeek": 4, "startTime": "09:00", "endTime": "17:00" },
+      { "dayOfWeek": 5, "startTime": "09:00", "endTime": "17:00" }
+    ],
+    "dateOverrides": [
+      { "date": "2025-12-25", "isBlocked": true }
+    ]
+  }
+]
+```
+
+### Get Availability Schedule
+
+```
+GET /api/v1/availability/:id
+```
+
+### Create Availability Schedule
+
+```
+POST /api/v1/availability
+```
+
+**Body:**
+
+```json
+{
+  "name": "Business Hours",
+  "timezone": "America/New_York",
+  "isDefault": true,
+  "rules": [
+    { "dayOfWeek": 1, "startTime": "09:00", "endTime": "12:00" },
+    { "dayOfWeek": 1, "startTime": "13:00", "endTime": "17:00" },
+    { "dayOfWeek": 2, "startTime": "09:00", "endTime": "17:00" },
+    { "dayOfWeek": 3, "startTime": "09:00", "endTime": "17:00" },
+    { "dayOfWeek": 4, "startTime": "09:00", "endTime": "17:00" },
+    { "dayOfWeek": 5, "startTime": "09:00", "endTime": "15:00" }
+  ]
+}
+```
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | no | Schedule name (default: "Working Hours") |
+| `timezone` | string | no | IANA timezone (default: user's timezone) |
+| `isDefault` | boolean | no | Set as default schedule |
+| `rules` | array | yes | Weekly availability rules |
+| `rules[].dayOfWeek` | number | yes | Day of week (0=Sunday ... 6=Saturday) |
+| `rules[].startTime` | string | yes | Start time in HH:mm (e.g. "09:00") |
+| `rules[].endTime` | string | yes | End time in HH:mm (e.g. "17:00") |
+
+Multiple rules per day are supported (e.g. morning + afternoon blocks with a lunch break).
+
+### Update Availability Schedule
+
+```
+PUT /api/v1/availability/:id
+```
+
+If `rules` or `dateOverrides` arrays are provided, they **replace** all existing rules/overrides.
+
+### Delete Availability Schedule
+
+```
+DELETE /api/v1/availability/:id
+```
+
+Cannot delete your only availability schedule.
+
+---
+
+## Bookings
+
+### List Bookings
+
+```
+GET /api/v1/bookings
+```
+
+**Query Parameters:**
+
+| Name | Type | Default | Description |
+|---|---|---|---|
+| `filter` | enum | `upcoming` | `upcoming`, `past`, `cancelled`, `pending`, `all` |
+| `limit` | number | `20` | Max results (1-100) |
+| `offset` | number | `0` | Skip N results for pagination |
+
+**Response:**
+
+```json
+[
+  {
+    "uid": "abc-123-def",
+    "eventType": "Discovery Call",
+    "eventSlug": "discovery-call",
+    "guestName": "Jane Doe",
+    "guestEmail": "jane@example.com",
+    "guestTimezone": "America/Chicago",
+    "startTime": "2025-01-15T14:00:00.000Z",
+    "endTime": "2025-01-15T14:45:00.000Z",
+    "status": "CONFIRMED",
+    "notes": "Looking forward to chatting!"
+  }
+]
+```
+
+### Get Booking
+
+```
+GET /api/v1/bookings/:uid
+```
+
+### Update Booking Status
+
+```
+PATCH /api/v1/bookings/:uid
+```
+
+**Body:**
+
+```json
+{
+  "action": "confirm"
+}
+```
+
+Supported actions:
+
+| Action | From Status | To Status | Description |
+|---|---|---|---|
+| `confirm` | PENDING | CONFIRMED | Approve a pending booking |
+| `cancel` | PENDING, CONFIRMED | CANCELLED | Cancel with optional `reason` |
+| `no_show` | CONFIRMED | NO_SHOW | Mark guest as no-show |
+
+For `cancel`, you can include a `reason` field:
+
+```json
+{
+  "action": "cancel",
+  "reason": "Schedule conflict"
+}
+```
+
+---
+
+## API Keys
+
+### List API Keys
+
+```
+GET /api/v1/api-keys
+```
+
+Returns all API keys (masked for security).
+
+**Response:**
+
+```json
+[
+  {
+    "id": "clx...",
+    "name": "My Agent Key",
+    "key": "gck_a1b2...x9y0",
+    "expiresAt": "2026-01-15T00:00:00.000Z",
+    "lastUsed": "2025-06-10T14:30:00.000Z",
+    "createdAt": "2025-01-01T00:00:00.000Z"
+  }
+]
+```
+
+### Create API Key
+
+```
+POST /api/v1/api-keys
+```
+
+**Body:**
+
+```json
+{
+  "name": "Production Agent",
+  "expiresInDays": 90
+}
+```
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | yes | Descriptive name for this key |
+| `expiresInDays` | number | no | Key expiration in days (null = never) |
+
+**Response (201):**
+
+```json
+{
+  "id": "clx...",
+  "name": "Production Agent",
+  "key": "gck_a1b2c3d4e5f6...",
+  "expiresAt": "2025-04-15T00:00:00.000Z"
+}
+```
+
+The full key is only returned once. Store it securely.
+
+### Revoke API Key
+
+```
+DELETE /api/v1/api-keys/:id
+```
+
+Permanently revokes the API key.
+
+---
+
+## Public Endpoints
+
+These endpoints do not require authentication and are used by guests to view availability and create bookings.
+
+### Get Available Slots
+
+```
+GET /api/availability/:username?eventSlug=slug&from=YYYY-MM-DD&to=YYYY-MM-DD&timezone=America/New_York
+```
+
+| Name | Type | Required | Description |
+|---|---|---|---|
+| `username` | path | yes | The host's username |
+| `eventSlug` | query | yes | The event type slug |
+| `from` | query | no | Start date (defaults to today) |
+| `to` | query | no | End date (defaults to 7 days out) |
+| `timezone` | query | no | Guest timezone |
+
+### Create a Booking (Guest)
+
+```
+POST /api/bookings
+```
+
+```json
+{
+  "eventTypeId": "clx...",
+  "startTime": "2025-01-15T14:00:00.000Z",
+  "guestName": "Jane Doe",
+  "guestEmail": "jane@example.com",
+  "guestTimezone": "America/New_York",
+  "notes": "Looking forward to our call"
+}
+```
+
+---
+
+## Webhooks
+
+Subscribe to real-time events by creating webhooks in **Dashboard &gt; Settings**.
+
+### Supported Events
+
+| Event | Description |
+|---|---|
+| `BOOKING_CREATED` | A new booking was created |
+| `BOOKING_CONFIRMED` | A pending booking was confirmed |
+| `BOOKING_CANCELLED` | A booking was cancelled |
+| `BOOKING_RESCHEDULED` | A booking was rescheduled |
+| `BOOKING_REMINDER` | A reminder was sent (24h before) |
+| `MEETING_ENDED` | A meeting has ended |
+
+### Webhook Payload
+
+```json
+{
+  "event": "BOOKING_CREATED",
+  "data": {
+    "bookingUid": "abc-123",
+    "eventType": "30-min-call",
+    "guestName": "Jane Doe",
+    "guestEmail": "jane@example.com",
+    "startTime": "2025-01-15T14:00:00.000Z",
+    "endTime": "2025-01-15T14:30:00.000Z"
+  },
+  "timestamp": "2025-01-14T10:00:00.000Z"
+}
+```
+
+### Verifying Signatures
+
+Each webhook includes an `X-GudCal-Signature` header with an HMAC-SHA256 signature:
+
+```javascript
+import { createHmac } from "crypto";
+
+function verifySignature(payload, signature, secret) {
+  const expected = createHmac("sha256", secret)
+    .update(payload)
+    .digest("hex");
+  return expected === signature;
+}
+```
+
+---
+
+## Rate Limits
+
+API endpoints are rate-limited. If exceeded, you'll receive a `429 Too Many Requests` response. Respect the `Retry-After` header value before retrying.
+
+---
+
+## Full Agent Workflow Example
+
+Once you've registered and created an API key from the dashboard, hand it to your agent. Here's what the agent can do from there:
+
+```bash
+# Step 1: Set up profile
+curl -X PUT https://gudcal.com/api/v1/me \
+  -H "Authorization: Bearer gck_your_key" \
+  -H "Content-Type: application/json" \
+  -d '{"username": "tim", "timezone": "Africa/Lagos"}'
+
+# Step 2: Create availability schedule
+curl -X POST https://gudcal.com/api/v1/availability \
+  -H "Authorization: Bearer gck_your_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Business Hours",
+    "timezone": "Africa/Lagos",
+    "isDefault": true,
+    "rules": [
+      {"dayOfWeek": 1, "startTime": "09:00", "endTime": "17:00"},
+      {"dayOfWeek": 2, "startTime": "09:00", "endTime": "17:00"},
+      {"dayOfWeek": 3, "startTime": "09:00", "endTime": "17:00"},
+      {"dayOfWeek": 4, "startTime": "09:00", "endTime": "17:00"},
+      {"dayOfWeek": 5, "startTime": "09:00", "endTime": "15:00"}
+    ]
+  }'
+
+# Step 3: Create event types
+curl -X POST https://gudcal.com/api/v1/event-types \
+  -H "Authorization: Bearer gck_your_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Quick Chat",
+    "slug": "quick-chat",
+    "duration": 15,
+    "description": "A quick 15-minute chat"
+  }'
+
+curl -X POST https://gudcal.com/api/v1/event-types \
+  -H "Authorization: Bearer gck_your_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Strategy Session",
+    "slug": "strategy-session",
+    "duration": 60,
+    "requiresConfirmation": true,
+    "bufferBefore": 10,
+    "bufferAfter": 10
+  }'
+
+# Booking page is now live at gudcal.com/tim
+
+# Step 4: Check pending bookings
+curl https://gudcal.com/api/v1/bookings?filter=pending \
+  -H "Authorization: Bearer gck_your_key"
+
+# Step 5: Confirm a pending booking
+curl -X PATCH https://gudcal.com/api/v1/bookings/abc-123 \
+  -H "Authorization: Bearer gck_your_key" \
+  -H "Content-Type: application/json" \
+  -d '{"action": "confirm"}'
+```

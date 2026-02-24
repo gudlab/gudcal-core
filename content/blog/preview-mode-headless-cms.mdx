@@ -1,0 +1,100 @@
+---
+title: "Self-Hosting GudCal: Complete Guide to Running Your Own Scheduling Platform"
+description: "Step-by-step guide to deploying GudCal on your own infrastructure with Docker, PostgreSQL, and full control over your data."
+image: /_static/blog/blog-post-1.jpg
+date: "2026-02-05"
+authors:
+  - timchosen
+categories:
+  - education
+related:
+  - deploying-next-apps
+  - server-client-components
+---
+
+One of GudCal's core promises is that you can run it anywhere. No vendor lock-in, no data leaving your infrastructure. Here's how to get GudCal running on your own server in under 30 minutes.
+
+## Why Self-Host?
+
+There are solid reasons to run your own scheduling platform:
+
+- **Data sovereignty** — booking data, guest information, and calendar tokens never leave your infrastructure
+- **Compliance** — meet GDPR, HIPAA, or internal data residency requirements
+- **Customization** — modify the source code to fit your exact needs
+- **Cost control** — no per-seat pricing for your team
+
+## Prerequisites
+
+You'll need:
+
+- A server or VPS (2GB RAM minimum)
+- PostgreSQL 14+ (or a hosted service like Neon or Supabase)
+- Node.js 18.17+ or Docker
+- A domain with HTTPS configured
+
+## Method 1: Docker (Recommended)
+
+The fastest way to get running:
+
+```bash
+git clone https://github.com/cavewebs/gudcal.git
+cd gudcal
+cp .env.example .env.local
+```
+
+Edit `.env.local` with your database URL, authentication secrets, and other configuration. Then:
+
+```bash
+docker compose up -d
+```
+
+GudCal will be available on port 3000. Point your reverse proxy at it and you're live.
+
+## Method 2: Manual Deployment
+
+For more control over the build process:
+
+```bash
+git clone https://github.com/cavewebs/gudcal.git
+cd gudcal
+pnpm install
+pnpm prisma generate
+pnpm prisma db push
+pnpm build
+pnpm start
+```
+
+## Essential Configuration
+
+At minimum, you need these environment variables:
+
+| Variable | Purpose |
+|---|---|
+| `DATABASE_URL` | PostgreSQL connection string |
+| `AUTH_SECRET` | Random 32+ character secret |
+| `NEXT_PUBLIC_APP_URL` | Your public URL |
+| `GOOGLE_CLIENT_ID` | Google OAuth (for login) |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth secret |
+| `RESEND_API_KEY` | Email notifications |
+
+## Calendar Integration
+
+To enable Google Calendar sync, you'll need separate OAuth credentials with calendar scopes. Set `GOOGLE_CALENDAR_CLIENT_ID` and `GOOGLE_CALENDAR_CLIENT_SECRET` in your environment.
+
+## Keeping Updated
+
+GudCal follows semantic versioning. To update:
+
+```bash
+git pull origin main
+pnpm install
+pnpm prisma generate
+pnpm prisma db push
+pnpm build
+```
+
+Check the changelog before upgrading — we note any breaking changes or migration steps.
+
+## Need Help?
+
+Open an issue on GitHub or check the [self-hosting documentation](/docs/self-hosting) for detailed configuration options.

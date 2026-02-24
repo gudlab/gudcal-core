@@ -1,0 +1,98 @@
+---
+title: Self-Hosting
+description: Deploy GudCal on your own infrastructure.
+---
+
+GudCal is designed to be self-hosted. Run it on your own server, VPS, or container platform with full control over your data.
+
+## Prerequisites
+
+- **Node.js** 18.17 or later
+- **PostgreSQL** 14 or later (Neon, Supabase, or self-hosted)
+- **pnpm** package manager
+
+## Quick Start
+
+1. Clone the repository:
+
+```bash
+git clone https://github.com/cavewebs/gudcal.git
+cd gudcal
+```
+
+2. Install dependencies:
+
+```bash
+pnpm install
+```
+
+3. Copy the environment file and configure it:
+
+```bash
+cp .env.example .env.local
+```
+
+4. Set up the database:
+
+```bash
+pnpm prisma generate
+pnpm prisma db push
+```
+
+5. Start the application:
+
+```bash
+pnpm build
+pnpm start
+```
+
+## Environment Variables
+
+These are the required environment variables for self-hosting:
+
+| Variable | Description |
+|---|---|
+| `DATABASE_URL` | PostgreSQL connection string |
+| `NEXTAUTH_SECRET` | Random secret for session encryption |
+| `NEXTAUTH_URL` | Your deployment URL (e.g. `https://cal.example.com`) |
+| `NEXT_PUBLIC_APP_URL` | Same as NEXTAUTH_URL |
+| `GOOGLE_CLIENT_ID` | Google OAuth client ID |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
+| `ENCRYPTION_KEY` | 32-byte hex key for encrypting calendar tokens |
+
+### Optional Variables
+
+| Variable | Description |
+|---|---|
+| `RESEND_API_KEY` | For sending email notifications |
+| `STRIPE_*` | For billing (not needed for self-hosted free usage) |
+| `GOOGLE_CALENDAR_CLIENT_ID` | For Google Calendar integration |
+| `GOOGLE_CALENDAR_CLIENT_SECRET` | For Google Calendar integration |
+| `CRON_SECRET` | Secret for the reminder cron endpoint |
+| `NEXT_PUBLIC_IS_SELF_HOSTED` | Set to `true` to disable cloud-only features |
+
+## Self-Hosted vs Cloud
+
+When `NEXT_PUBLIC_IS_SELF_HOSTED=true`, the following features are disabled:
+
+- Analytics dashboard
+- MCP server (Team plan feature)
+- AI features
+- Custom domains
+
+All core scheduling features work identically in both modes.
+
+## Generating an Encryption Key
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+## Reverse Proxy
+
+If you run GudCal behind a reverse proxy (nginx, Caddy, etc.), make sure to:
+
+- Forward the `Host` header
+- Set `X-Forwarded-Proto` to `https`
+- Set `X-Forwarded-For` to the client IP
+- Configure WebSocket passthrough if needed

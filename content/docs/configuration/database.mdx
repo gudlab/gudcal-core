@@ -1,0 +1,42 @@
+---
+title: Database
+description: How to configure your PostgreSQL database with Neon.
+---
+
+GudCal uses **PostgreSQL** as its database, hosted on [Neon](https://neon.tech/) with Prisma as the ORM. Neon offers a generous free tier that works well for development and small deployments.
+
+Check their [pricing page](https://neon.tech/pricing) for more information.
+
+## Steps
+
+<Steps>
+
+### Create Neon account
+
+If you don't have a Neon account, follow their steps [here](https://neon.tech/docs/get-started-with-neon/signing-up) to create one.
+
+### Copy database URL
+
+After creating a project on Neon, copy the database URL. Select `Prisma` from the connection type list, then the `env` tab.
+
+<Callout type="warning">
+  <b>Don't forget</b> to reveal the information hidden behind the stars using
+  the eye icon. It's not very visible in dark mode.
+</Callout>
+
+Paste in your `.env` file:
+
+```js
+DATABASE_URL = "postgres://alex:AbC123dEf@ep-cool-darkness-123456.us-east-2.aws.neon.tech/dbname";
+```
+
+### Generate Prisma client and push migrations
+
+Generate the Prisma client and push the schema to your database:
+
+```bash
+pnpm prisma generate
+pnpm prisma db push
+```
+
+</Steps>

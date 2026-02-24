@@ -1,0 +1,398 @@
+---
+title: MCP Server
+description: Use AI agents to manage your entire GudCal scheduling operation via the Model Context Protocol. 18 tools for full agent autonomy.
+---
+
+GudCal includes a built-in **Model Context Protocol (MCP)** server with 18 tools that allow AI agents to fully manage scheduling operations — from creating event types and setting availability to confirming bookings and managing API keys — all without the user ever touching the web interface.
+
+## What is MCP?
+
+The [Model Context Protocol](https://modelcontextprotocol.io/) is an open standard for connecting AI assistants to external tools and data sources. GudCal implements an MCP server that exposes scheduling operations as tools that any MCP-compatible AI agent can call.
+
+## Endpoint
+
+```
+POST /api/mcp
+```
+
+The MCP server uses HTTP transport with JSON-RPC messages.
+
+## Authentication
+
+GudCal MCP tools are split into two categories:
+
+**Public tools** (no auth required): `list_event_types`, `get_availability`, `create_booking`, `cancel_booking` — these operate on public scheduling data, allowing any agent to discover availability and book meetings.
+
+**Authenticated tools** (API key required): All other tools require passing your GudCal API key as the `apiKey` parameter.
+
+### Getting Your API Key
+
+1. **Register** at `https://gudcal.com/register` (email/password or Google OAuth)
+2. Go to **Dashboard &gt; Settings &gt; API Keys**
+3. Click **Create API Key**, give it a name, and copy the key
+4. Hand this key to your AI agent
+
+The API key is the handoff point — a human registers and creates the initial key, then the agent can autonomously manage everything else.
+
+---
+
+## Public Tools
+
+These tools do not require authentication and are designed for guests and external agents to interact with public scheduling data.
+
+### list_event_types
+
+List active event types for a user. Use this to discover what meeting types someone offers.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `username` | string | yes | The username of the host |
+
+**Returns:** Array of event types with `id`, `title`, `slug`, `description`, `duration`, and `locationType`.
+
+### get_availability
+
+Get available time slots for a specific event type. Use this to find open times before booking.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `username` | string | yes | The username of the host |
+| `eventSlug` | string | yes | The event type slug |
+| `dateFrom` | string | no | Start date in YYYY-MM-DD (defaults to today) |
+| `dateTo` | string | no | End date in YYYY-MM-DD (defaults to 7 days out) |
+| `timezone` | string | no | Guest timezone (defaults to UTC) |
+
+**Returns:** Array of dates with available time slots (start/end in ISO 8601).
+
+### create_booking
+
+Book a time slot with a user. The slot must be available (use `get_availability` first).
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `username` | string | yes | The username of the host |
+| `eventSlug` | string | yes | The event type slug |
+| `startTime` | string | yes | Start time in ISO 8601 (UTC) |
+| `guestName` | string | yes | Full name of the guest |
+| `guestEmail` | string | yes | Email of the guest |
+| `guestTimezone` | string | no | Guest timezone (defaults to UTC) |
+| `notes` | string | no | Notes for the meeting |
+
+**Returns:** Booking ID (`uid`), status, start/end times, and confirmation URL.
+
+### cancel_booking
+
+Cancel a booking by its UID. Requires the guest email for verification.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `bookingUid` | string | yes | The booking UID |
+| `guestEmail` | string | yes | Guest email (for verification) |
+| `reason` | string | no | Reason for cancellation |
+
+---
+
+## Authenticated Tools — Profile
+
+### get_profile
+
+Get the authenticated user's profile information.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `apiKey` | string | yes | Your GudCal API key |
+
+**Returns:** User profile with `id`, `name`, `email`, `username`, `timezone`, `bio`, `weekStart`.
+
+### update_profile
+
+Update the authenticated user's profile. All fields except `apiKey` are optional.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `apiKey` | string | yes | Your GudCal API key |
+| `name` | string | no | Display name |
+| `username` | string | no | Username (letters, numbers, hyphens, underscores) |
+| `timezone` | string | no | IANA timezone (e.g. `America/New_York`) |
+| `bio` | string | no | Short bio (max 500 chars) |
+| `weekStart` | number | no | Week start (0=Sun, 1=Mon, ...6=Sat) |
+
+---
+
+## Authenticated Tools — Event Types
+
+### get_my_event_types
+
+List all event types owned by the authenticated user, including inactive ones and booking counts.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `apiKey` | string | yes | Your GudCal API key |
+
+**Returns:** Array of event types with full details including `availability` info and `bookingCount`.
+
+### create_event_type
+
+Create a new event type.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `apiKey` | string | yes | Your GudCal API key |
+| `title` | string | yes | Event type title |
+| `slug` | string | yes | URL slug (lowercase, hyphens, e.g. `30-min-call`) |
+| `description` | string | no | Description (max 2000 chars) |
+| `duration` | number | no | Duration in minutes (default: 30) |
+| `locationType` | enum | no | `IN_PERSON`, `GOOGLE_MEET`, `ZOOM`, `PHONE`, `CUSTOM` |
+| `locationValue` | string | no | Location details |
+| `isActive` | boolean | no | Whether active (default: true) |
+| `requiresConfirmation` | boolean | no | Require manual confirmation |
+| `bufferBefore` | number | no | Buffer before in minutes |
+| `bufferAfter` | number | no | Buffer after in minutes |
+| `minimumNotice` | number | no | Minimum advance notice in minutes |
+| `maxBookingsPerDay` | number | no | Max bookings per day |
+| `slotInterval` | number | no | Custom slot interval in minutes |
+| `color` | string | no | Hex color code |
+| `availabilityId` | string | no | Availability schedule ID to link |
+
+**Returns:** Created event type with `id`, `title`, `slug`, `duration`, `isActive`, and `bookingUrl`.
+
+### update_event_type
+
+Update an existing event type. All fields except `apiKey` and `eventTypeId` are optional.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `apiKey` | string | yes | Your GudCal API key |
+| `eventTypeId` | string | yes | The event type ID to update |
+| All fields from `create_event_type` | various | no | Fields to update |
+
+### delete_event_type
+
+Delete an event type and all its associated bookings.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `apiKey` | string | yes | Your GudCal API key |
+| `eventTypeId` | string | yes | The event type ID to delete |
+
+---
+
+## Authenticated Tools — Availability
+
+### list_availability_schedules
+
+List all availability schedules with weekly rules and date overrides.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `apiKey` | string | yes | Your GudCal API key |
+
+**Returns:** Array of schedules with `id`, `name`, `timezone`, `isDefault`, `rules`, and `dateOverrides`.
+
+### create_availability
+
+Create a new availability schedule with weekly rules.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `apiKey` | string | yes | Your GudCal API key |
+| `name` | string | no | Schedule name (default: "Working Hours") |
+| `timezone` | string | no | IANA timezone (default: user's timezone) |
+| `isDefault` | boolean | no | Set as default schedule |
+| `rules` | array | yes | Weekly availability rules |
+| `rules[].dayOfWeek` | number | yes | Day of week (0=Sunday...6=Saturday) |
+| `rules[].startTime` | string | yes | Start time in HH:mm (e.g. "09:00") |
+| `rules[].endTime` | string | yes | End time in HH:mm (e.g. "17:00") |
+
+Multiple rules per day are supported (e.g. morning and afternoon blocks):
+
+```json
+{
+  "apiKey": "gck_...",
+  "name": "Split Schedule",
+  "rules": [
+    { "dayOfWeek": 1, "startTime": "09:00", "endTime": "12:00" },
+    { "dayOfWeek": 1, "startTime": "14:00", "endTime": "18:00" }
+  ]
+}
+```
+
+### update_availability
+
+Update an availability schedule. If `rules` are provided, they **replace** all existing rules.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `apiKey` | string | yes | Your GudCal API key |
+| `availabilityId` | string | yes | Schedule ID to update |
+| `name` | string | no | Schedule name |
+| `timezone` | string | no | IANA timezone |
+| `isDefault` | boolean | no | Set as default |
+| `rules` | array | no | Replacement weekly rules |
+
+### delete_availability
+
+Delete an availability schedule. Cannot delete your only schedule.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `apiKey` | string | yes | Your GudCal API key |
+| `availabilityId` | string | yes | Schedule ID to delete |
+
+---
+
+## Authenticated Tools — Bookings
+
+### get_bookings
+
+Get bookings for the authenticated user with filtering and pagination.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `apiKey` | string | yes | Your GudCal API key |
+| `filter` | enum | no | `upcoming` (default), `past`, `cancelled`, `pending`, `all` |
+| `limit` | number | no | Max results (1-100, default: 20) |
+| `offset` | number | no | Skip N results (default: 0) |
+
+**Returns:** Array of bookings with `uid`, `eventType`, `eventSlug`, `guestName`, `guestEmail`, `guestTimezone`, `startTime`, `endTime`, `status`, `notes`, `cancelReason`.
+
+### confirm_booking
+
+Confirm a pending booking. Only works on PENDING bookings.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `apiKey` | string | yes | Your GudCal API key |
+| `bookingUid` | string | yes | The booking UID to confirm |
+
+### cancel_booking_as_host
+
+Cancel a booking as the host. Works on CONFIRMED or PENDING bookings.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `apiKey` | string | yes | Your GudCal API key |
+| `bookingUid` | string | yes | The booking UID to cancel |
+| `reason` | string | no | Reason for cancellation |
+
+### mark_no_show
+
+Mark a confirmed booking as no-show.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `apiKey` | string | yes | Your GudCal API key |
+| `bookingUid` | string | yes | The booking UID |
+
+---
+
+## Authenticated Tools — API Keys
+
+### list_api_keys
+
+List all API keys (masked for security).
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `apiKey` | string | yes | Your GudCal API key |
+
+### create_api_key
+
+Create a new API key. The full key is returned only once.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `apiKey` | string | yes | Your current GudCal API key |
+| `name` | string | yes | Descriptive name (e.g. "My Agent") |
+| `expiresInDays` | number | no | Expiration in days (null = never) |
+
+### revoke_api_key
+
+Revoke (permanently delete) an API key.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `apiKey` | string | yes | Your GudCal API key |
+| `keyId` | string | yes | ID of the key to revoke |
+
+---
+
+## Agent Workflow Examples
+
+### Example 1: Guest Agent Books a Meeting
+
+An external AI agent books a meeting on behalf of its user — no authentication needed:
+
+1. **Discover event types**: Call `list_event_types` with the host's username
+2. **Check availability**: Call `get_availability` with the event slug and preferred dates
+3. **Book a slot**: Call `create_booking` with guest details and selected time
+4. **Cancel if needed**: Call `cancel_booking` with the booking UID and guest email
+
+### Example 2: Host Agent Sets Up Everything
+
+After the user registers and creates an API key from the dashboard, the agent takes over:
+
+```
+1. update_profile       → Set username, timezone, bio
+2. create_availability  → Define working hours (Mon-Fri 9am-5pm)
+3. create_event_type    → "Quick Chat" (15 min)
+4. create_event_type    → "Strategy Session" (60 min, requires confirmation)
+5. get_bookings         → Check for pending bookings
+6. confirm_booking      → Approve a pending strategy session
+7. cancel_booking_as_host → Cancel a conflicting meeting
+8. mark_no_show         → Record a missed meeting
+```
+
+### Example 3: Full Agent Setup
+
+A user registers, creates an API key in the dashboard, and hands it to their agent. The agent then builds the entire scheduling operation:
+
+```
+Step 1: update_profile
+  → username: "alex", timezone: "Europe/London"
+
+Step 2: create_availability
+  → Mon-Thu 10:00-18:00, Fri 10:00-14:00
+
+Step 3: create_event_type
+  → "Coffee Chat" / 15 min / no confirmation
+
+Step 4: create_event_type
+  → "Technical Review" / 45 min / requires confirmation / 10 min buffer
+
+Step 5: create_event_type
+  → "Team Standup" / 30 min / Zoom
+
+Step 6: create_api_key
+  → "Slack Bot" / expires in 90 days
+```
+
+The user's booking page is now live at `gudcal.com/alex` and the Slack bot has its own API key for ongoing operations.
+
+**The human handles registration and initial API key creation.** From there, the agent manages everything autonomously via MCP tools.
+
+---
+
+## Configuring MCP Clients
+
+### Claude Desktop
+
+Add GudCal to your Claude Desktop MCP configuration (`~/Library/Application Support/Claude/claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "gudcal": {
+      "url": "https://gudcal.com/api/mcp"
+    }
+  }
+}
+```
+
+### Cursor / Other MCP Clients
+
+Point your MCP client to `https://gudcal.com/api/mcp` (or your self-hosted URL) using HTTP transport.
+
+## Self-Hosting
+
+Self-hosted GudCal instances expose the MCP server at `/api/mcp` automatically. No additional configuration is needed — the MCP endpoint is available as soon as your instance is running.

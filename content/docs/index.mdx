@@ -1,0 +1,53 @@
+---
+title: Introduction
+description: Welcome to the GudCal documentation.
+---
+
+<Image
+  src="/_static/images/x-preview.jpg"
+  width="1100"
+  height="550"
+  alt="GudCal dashboard preview"
+  priority
+/>
+
+GudCal is **open-source scheduling infrastructure** for the AI agent era. It is a self-hostable Calendly alternative with an MCP server, team scheduling, and smart availability management.
+
+## Key Features
+
+- **Agent-First** — 18 MCP tools + full REST API let AI agents manage your entire scheduling operation autonomously
+- **Scheduling** — Event types, availability rules, buffer times, timezone-aware booking pages
+- **Calendar Sync** — Google Calendar integration with conflict detection
+- **MCP Server** — AI agents can create event types, set availability, manage bookings, and more via Model Context Protocol
+- **REST API** — Full CRUD API with key authentication for event types, availability, bookings, and profile management
+- **Teams** — Organizations with round-robin and collective scheduling
+- **Webhooks** — Real-time event notifications for booking lifecycle events
+- **Self-Hostable** — Deploy on your own infrastructure with Docker or any Node.js host
+- **Generous Free Tier** — 3 event types, unlimited bookings, calendar sync at no cost
+
+## Quick Links
+
+- [Installation](/docs/installation) — Get GudCal running locally
+- [Self-Hosting](/docs/self-hosting) — Deploy on your own infrastructure
+- [API Reference](/docs/api) — Full REST API documentation (event types, availability, bookings, profile, API keys)
+- [MCP Server](/docs/mcp) — AI agent integration guide (18 tools for full autonomous operation)
+
+## Agent-First Architecture
+
+GudCal is designed so that a human registers once, creates an API key, and then an AI agent can run their entire scheduling operation autonomously:
+
+1. **Register** at `gudcal.com/register` (human — email/password or Google OAuth)
+2. **Create an API key** from Dashboard &gt; Settings &gt; API Keys (human)
+3. **Hand the key to your agent** — from here, the agent manages everything:
+   - **Set up your profile** — username, timezone, bio
+   - **Create availability** — define your working hours
+   - **Create event types** — the meeting types you offer
+   - **Manage bookings** — confirm, cancel, or mark no-shows
+
+The human handles registration and the initial API key. Everything after that is fully autonomous via the REST API or MCP tools.
+
+## Tech Stack
+
+GudCal is built with Next.js, TypeScript, Prisma, PostgreSQL (Neon), Auth.js v5, Stripe, Resend, React Email, Shadcn/ui, and Tailwind CSS.
+
+This documentation covers setup, configuration, and integration for both cloud and self-hosted deployments.

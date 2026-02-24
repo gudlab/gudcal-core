@@ -1,0 +1,56 @@
+---
+title: "Why We Built GudCal: Open-Source Scheduling for the AI Era"
+description: "The story behind GudCal — why we created an open-source, self-hostable scheduling platform built for AI agents and developers."
+image: /_static/blog/blog-post-3.jpg
+date: "2026-02-15"
+authors:
+  - timchosen
+categories:
+  - news
+related:
+  - server-client-components
+  - preview-mode-headless-cms
+---
+
+Scheduling software has been around for years. Calendly pioneered the space, and dozens of alternatives have followed. So why build another one?
+
+The answer is simple: **the AI agent era changes everything about scheduling**.
+
+## The Problem with Current Scheduling Tools
+
+Most scheduling platforms were designed for humans clicking buttons. You share a link, someone picks a time, done. That workflow works — but it completely breaks down when AI agents need to schedule on behalf of users.
+
+We saw this firsthand. When building AI-powered workflows, we kept hitting the same wall: scheduling tools had no programmatic interface that worked well with language models. APIs were an afterthought, webhook support was limited, and the concept of an AI agent discovering availability and booking meetings was simply not supported.
+
+## What Makes GudCal Different
+
+GudCal was built from day one with three principles:
+
+**1. Agent-First Architecture**
+
+GudCal ships with a built-in MCP (Model Context Protocol) server. Any AI agent — Claude, GPT, or custom models — can discover your event types, check availability, and create bookings through a standardized protocol. No API key wrangling, no custom integration code.
+
+**2. Open Source and Self-Hostable**
+
+Your scheduling data is yours. Deploy GudCal on your own infrastructure with Docker, or use our cloud version. The entire codebase is GPL-3.0 licensed and available on GitHub.
+
+**3. Developer-First Design**
+
+REST API, webhooks, TypeScript SDK — GudCal is built by developers, for developers. Every feature that works in the UI also works through the API.
+
+## The Tech Stack
+
+We chose a modern, battle-tested stack:
+
+- **Next.js 16** with App Router for the frontend and API
+- **PostgreSQL** via Neon for reliable data storage
+- **Auth.js v5** for flexible authentication (Google, email, password)
+- **Prisma 7** for type-safe database access
+- **Tailwind CSS 4** and shadcn/ui for the interface
+- **Resend** and React Email for beautiful transactional emails
+
+## What's Next
+
+We're actively working on more integrations, improved team scheduling features, and deeper MCP capabilities. GudCal is open source — contributions and feedback are always welcome.
+
+If you're building AI-powered workflows and need scheduling that actually works with agents, give GudCal a try.

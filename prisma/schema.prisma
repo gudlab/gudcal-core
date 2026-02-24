@@ -1,0 +1,366 @@
+// GudCal — Prisma Schema
+// https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── ENUMS ────────────────────────────────────────────────
+
+enum UserRole {
+  ADMIN
+  USER
+}
+
+enum OrgRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  RESCHEDULED
+  NO_SHOW
+}
+
+enum EventLocationKind {
+  IN_PERSON
+  GOOGLE_MEET
+  ZOOM
+  PHONE
+  CUSTOM
+}
+
+enum SchedulingKind {
+  INDIVIDUAL
+  ROUND_ROBIN
+  COLLECTIVE
+}
+
+enum CalendarProvider {
+  GOOGLE
+  OUTLOOK
+}
+
+enum WebhookEvent {
+  BOOKING_CREATED
+  BOOKING_CONFIRMED
+  BOOKING_CANCELLED
+  BOOKING_RESCHEDULED
+  BOOKING_REMINDER
+  MEETING_ENDED
+}
+
+// ─── EXISTING AUTH MODELS ─────────────────────────────────
+
+model Account {
+  id                String   @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?  @db.Text
+  access_token      String?  @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?  @db.Text
+  session_state     String?
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @default(now()) @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+model PasswordResetToken {
+  id      String   @id @default(cuid())
+  email   String
+  token   String   @unique
+  expires DateTime
+
+  @@index([email])
+  @@map("password_reset_tokens")
+}
+
+// ─── USER (extended) ──────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @default(now()) @map("updated_at")
+  role          UserRole  @default(USER)
+
+  password      String?
+
+  // GudCal profile fields
+  username  String? @unique
+  timezone  String  @default("America/New_York")
+  bio       String?
+  weekStart Int     @default(0) // 0 = Sunday, 1 = Monday
+
+  // Relations — auth
+  accounts Account[]
+  sessions Session[]
+
+  // Relations — scheduling
+  eventTypes          EventType[]
+  bookingsAsHost      Booking[]            @relation("HostBookings")
+  availabilities      Availability[]
+  calendarConnections CalendarConnection[]
+  webhooks            Webhook[]
+  apiKeys             ApiKey[]
+
+  // Relations — organizations
+  organizationMembers OrganizationMember[]
+
+  @@map("users")
+}
+
+// ─── ORGANIZATIONS ────────────────────────────────────────
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  logo      String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  members    OrganizationMember[]
+  eventTypes EventType[]
+  webhooks   Webhook[]
+
+  @@map("organizations")
+}
+
+model OrganizationMember {
+  id        String   @id @default(cuid())
+  userId    String
+  orgId     String
+  role      OrgRole  @default(MEMBER)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, orgId])
+  @@index([orgId])
+  @@map("organization_members")
+}
+
+// ─── EVENT TYPES ──────────────────────────────────────────
+
+model EventType {
+  id                   String            @id @default(cuid())
+  userId               String
+  orgId                String?
+  title                String
+  slug                 String
+  description          String?           @db.Text
+  duration             Int               @default(30) // minutes
+  locationType         EventLocationKind @default(GOOGLE_MEET)
+  locationValue        String?
+  color                String            @default("#0069FF")
+  isActive             Boolean           @default(true)
+  requiresConfirmation Boolean           @default(false)
+  bufferBefore         Int               @default(0) // minutes
+  bufferAfter          Int               @default(0) // minutes
+  maxBookingsPerDay    Int?
+  minimumNotice        Int               @default(120) // minutes (2 hours default)
+  slotInterval         Int?              // null = use duration as interval
+  schedulingType       SchedulingKind    @default(INDIVIDUAL)
+  price                Int?              // cents, for paid bookings
+  currency             String            @default("USD")
+  availabilityId       String?
+  customQuestions      Json?             // [{id, type, label, required, options?}]
+  createdAt            DateTime          @default(now()) @map("created_at")
+  updatedAt            DateTime          @updatedAt @map("updated_at")
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  availability Availability? @relation(fields: [availabilityId], references: [id])
+  bookings     Booking[]
+
+  @@unique([userId, slug])
+  @@index([orgId])
+  @@index([userId, isActive])
+  @@map("event_types")
+}
+
+// ─── AVAILABILITY ─────────────────────────────────────────
+
+model Availability {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String   @default("Working Hours")
+  isDefault Boolean  @default(false)
+  timezone  String   @default("America/New_York")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rules         AvailabilityRule[]
+  dateOverrides DateOverride[]
+  eventTypes    EventType[]
+
+  @@index([userId])
+  @@map("availabilities")
+}
+
+model AvailabilityRule {
+  id             String @id @default(cuid())
+  availabilityId String
+  dayOfWeek      Int    // 0 = Sunday … 6 = Saturday
+  startTime      String // "09:00" (HH:mm in availability timezone)
+  endTime        String // "17:00"
+
+  availability Availability @relation(fields: [availabilityId], references: [id], onDelete: Cascade)
+
+  @@index([availabilityId])
+  @@map("availability_rules")
+}
+
+model DateOverride {
+  id             String   @id @default(cuid())
+  availabilityId String
+  date           DateTime @db.Date
+  startTime      String?  // null if isBlocked = true
+  endTime        String?
+  isBlocked      Boolean  @default(false)
+
+  availability Availability @relation(fields: [availabilityId], references: [id], onDelete: Cascade)
+
+  @@index([availabilityId])
+  @@map("date_overrides")
+}
+
+// ─── BOOKINGS ─────────────────────────────────────────────
+
+model Booking {
+  id                String        @id @default(cuid())
+  uid               String        @unique @default(cuid()) // public-facing ID for guest links
+  eventTypeId       String
+  userId            String        // host user
+  guestName         String
+  guestEmail        String
+  guestTimezone     String
+  startTime         DateTime
+  endTime           DateTime
+  status            BookingStatus @default(CONFIRMED)
+  location          String?
+  notes             String?       @db.Text
+  cancelReason      String?
+  additionalGuests  Json?         // [{ name: string, email: string }]
+  metadata          Json?         // custom question answers, extra data
+  googleEventId     String?
+  rescheduledFromId String?
+  reminderSentAt    DateTime?
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+
+  eventType       EventType @relation(fields: [eventTypeId], references: [id], onDelete: Cascade)
+  host            User      @relation("HostBookings", fields: [userId], references: [id], onDelete: Cascade)
+  rescheduledFrom Booking?  @relation("RescheduledBookings", fields: [rescheduledFromId], references: [id])
+  rescheduledTo   Booking[] @relation("RescheduledBookings")
+
+  @@index([userId, startTime])
+  @@index([eventTypeId])
+  @@index([guestEmail])
+  @@index([status, startTime])
+  @@map("bookings")
+}
+
+// ─── CALENDAR CONNECTIONS ─────────────────────────────────
+
+model CalendarConnection {
+  id           String           @id @default(cuid())
+  userId       String
+  provider     CalendarProvider
+  accessToken  String           @db.Text
+  refreshToken String?          @db.Text
+  expiresAt    DateTime?
+  calendarId   String?          // specific calendar to check/write
+  isPrimary    Boolean          @default(false)
+  email        String?
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
+  @@map("calendar_connections")
+}
+
+// ─── WEBHOOKS ─────────────────────────────────────────────
+
+model Webhook {
+  id        String         @id @default(cuid())
+  userId    String
+  orgId     String?
+  url       String
+  events    WebhookEvent[]
+  secret    String
+  isActive  Boolean        @default(true)
+  createdAt DateTime       @default(now()) @map("created_at")
+  updatedAt DateTime       @updatedAt @map("updated_at")
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("webhooks")
+}
+
+// ─── API KEYS ─────────────────────────────────────────────
+
+model ApiKey {
+  id        String    @id @default(cuid())
+  userId    String
+  name      String
+  key       String    @unique
+  expiresAt DateTime?
+  lastUsed  DateTime?
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([key])
+  @@map("api_keys")
+}

@@ -1,0 +1,93 @@
+---
+title: Installation
+description: Get GudCal running locally for development or evaluation.
+---
+
+<Steps>
+
+### Clone the Repository
+
+```bash
+git clone https://github.com/cavewebs/gudcal.git
+cd gudcal
+```
+
+### Install Dependencies
+
+GudCal uses pnpm as its package manager:
+
+```bash
+pnpm install
+```
+
+### Configure Environment Variables
+
+Copy the example environment file and fill in your values:
+
+```bash
+cp .env.example .env.local
+```
+
+Required variables:
+
+```md title=".env.local"
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+
+AUTH_SECRET=your-random-secret-at-least-32-chars
+GOOGLE_CLIENT_ID=your-google-oauth-client-id
+GOOGLE_CLIENT_SECRET=your-google-oauth-client-secret
+
+DATABASE_URL=postgresql://user:password@host:5432/gudcal
+
+RESEND_API_KEY=your-resend-api-key
+```
+
+<Callout type="info" twClass="mt-4">
+  You can generate an `AUTH_SECRET` by running: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
+</Callout>
+
+### Set Up the Database
+
+GudCal uses PostgreSQL with Prisma. Generate the Prisma client and push the schema to your database:
+
+```bash
+pnpm prisma generate
+pnpm prisma db push
+```
+
+<Callout type="warning" twClass="mt-4">
+  Make sure your PostgreSQL database is running and the `DATABASE_URL` in your `.env.local` file is correct before running these commands.
+</Callout>
+
+### Start the Development Server
+
+```bash
+pnpm dev
+```
+
+GudCal will be available at [http://localhost:3000](http://localhost:3000).
+
+### Optional: Google Calendar Integration
+
+To enable Google Calendar sync, you'll need separate OAuth credentials with calendar scopes. Add these to your `.env.local`:
+
+```md
+GOOGLE_CALENDAR_CLIENT_ID=your-calendar-client-id
+GOOGLE_CALENDAR_CLIENT_SECRET=your-calendar-client-secret
+ENCRYPTION_KEY=your-32-byte-hex-encryption-key
+```
+
+Generate an encryption key:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+</Steps>
+
+## Next Steps
+
+- [Configuration](/docs/configuration/config-files) — Customize site name, links, and features
+- [Self-Hosting](/docs/self-hosting) — Deploy to production
+- [API Reference](/docs/api) — Integrate programmatically
+- [MCP Server](/docs/mcp) — Connect AI agents

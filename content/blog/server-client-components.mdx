@@ -1,0 +1,62 @@
+---
+title: "How AI Agents Use MCP to Schedule Meetings Autonomously"
+description: "A deep dive into how the Model Context Protocol enables AI agents to discover availability, book meetings, and manage scheduling without human intervention."
+image: /_static/blog/blog-post-4.jpg
+date: "2026-02-10"
+authors:
+  - timchosen
+categories:
+  - education
+related:
+  - deploying-next-apps
+  - preview-mode-headless-cms
+---
+
+The Model Context Protocol (MCP) is changing how AI agents interact with external tools. At GudCal, we've built MCP support directly into the platform, enabling any compatible AI agent to handle scheduling autonomously.
+
+## What is MCP?
+
+MCP is an open standard that lets AI assistants connect to external tools and data sources. Think of it as a universal adapter between language models and the services they need to interact with.
+
+Instead of building custom API integrations for every scheduling platform, an AI agent can use MCP to discover what tools are available and use them through a standardized interface.
+
+## How GudCal's MCP Server Works
+
+GudCal exposes five MCP tools that cover the complete scheduling workflow:
+
+### 1. Discover Event Types
+
+The agent calls `list_event_types` to see what meeting types a user offers — "30 Minute Call", "Technical Interview", "Product Demo", etc.
+
+### 2. Check Availability
+
+Using `get_availability`, the agent retrieves open time slots for a specific event type, respecting the host's availability rules, buffer times, and existing calendar events.
+
+### 3. Create a Booking
+
+The agent calls `create_booking` with the guest's details and selected time. GudCal handles conflict checking, confirmation emails, and calendar event creation automatically.
+
+### 4. Cancel or Reschedule
+
+If plans change, the agent can cancel bookings with `cancel_booking`, optionally providing a reason that gets included in the notification email.
+
+### 5. View Existing Bookings
+
+Authenticated agents can call `get_bookings` to retrieve upcoming, past, or cancelled bookings for the user.
+
+## A Real-World Example
+
+Imagine you're building a customer support AI. A customer says "I need to schedule a call with your team this week." The AI agent can:
+
+1. Call `list_event_types` to find the "Support Call" event type
+2. Call `get_availability` to find open slots this week
+3. Present the options to the customer
+4. Call `create_booking` once the customer picks a time
+
+The entire flow happens in seconds, with no human coordinator involved.
+
+## Getting Started
+
+GudCal's MCP server is available at `/api/mcp` on any GudCal instance. Public tools work without authentication — perfect for booking flows. Private tools require an API key for accessing user-specific data.
+
+Check out our [MCP documentation](/docs/mcp) for the full reference and integration examples.

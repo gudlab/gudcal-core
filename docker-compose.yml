@@ -1,0 +1,60 @@
+version: "3.8"
+
+services:
+  # ─── PostgreSQL Database ───────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: gudcal
+      POSTGRES_PASSWORD: gudcal_password
+      POSTGRES_DB: gudcal
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gudcal"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ─── GudCal App ──────────────────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      # App
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      NEXT_PUBLIC_IS_SELF_HOSTED: "true"
+
+      # Database (points to the db service above)
+      DATABASE_URL: postgres://gudcal:gudcal_password@db:5432/gudcal
+
+      # Auth — generate with: openssl rand -base64 32
+      AUTH_SECRET: ${AUTH_SECRET:?Set AUTH_SECRET in .env}
+
+      # Google OAuth
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+
+      # Email
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+
+      # Calendar integration
+      GOOGLE_CALENDAR_CLIENT_ID: ${GOOGLE_CALENDAR_CLIENT_ID:-}
+      GOOGLE_CALENDAR_CLIENT_SECRET: ${GOOGLE_CALENDAR_CLIENT_SECRET:-}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+
+      # Cron
+      CRON_SECRET: ${CRON_SECRET:-}
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

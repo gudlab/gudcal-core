@@ -1,0 +1,38 @@
+---
+title: Email
+description: How to manage emails in GudCal.
+---
+
+<Callout type="success" twClass="mt-0">
+  GudCal uses Resend for transactional emails including magic-link login, booking confirmations, and password reset flows.
+</Callout>
+
+## Steps
+
+<Callout type="note">
+  The email configuration follows the [Resend](https://resend.com/) documentation.
+  You can also refer to the official Auth.js docs
+  [here](https://authjs.dev/getting-started/installation#setup-environment) for more details.
+</Callout>
+
+<Steps>
+
+### Create an account
+
+If you don't have an account on Resend, sign up [here](https://resend.com/signup).
+
+### Create an API key
+
+After signing in to Resend, create your first API key.
+
+Copy/paste it in your `.env` file:
+
+```js
+RESEND_API_KEY = re_your_resend_api_key;
+```
+
+### Configure sender domain
+
+For production, add and verify your domain in Resend to send emails from your own address (e.g. `notifications@gudcal.com`).
+
+</Steps>
