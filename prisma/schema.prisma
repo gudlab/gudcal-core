@@ -50,6 +50,11 @@ enum CalendarProvider {
   OUTLOOK
 }
 
+enum EventVisibility {
+  PUBLIC
+  PRIVATE
+}
+
 enum WebhookEvent {
   BOOKING_CREATED
   BOOKING_CONFIRMED
@@ -199,6 +204,7 @@ model EventType {
   locationValue        String?
   color                String            @default("#0069FF")
   isActive             Boolean           @default(true)
+  visibility           EventVisibility   @default(PUBLIC)
   requiresConfirmation Boolean           @default(false)
   bufferBefore         Int               @default(0) // minutes
   bufferAfter          Int               @default(0) // minutes
@@ -220,7 +226,7 @@ model EventType {
 
   @@unique([userId, slug])
   @@index([orgId])
-  @@index([userId, isActive])
+  @@index([userId, isActive, visibility])
   @@map("event_types")
 }
 

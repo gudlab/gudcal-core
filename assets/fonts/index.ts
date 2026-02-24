@@ -1,9 +1,12 @@
-import { Inter as FontSans } from "next/font/google";
 import localFont from "next/font/local";
 
-export const fontSans = FontSans({
-  subsets: ["latin"],
+export const fontSans = localFont({
+  src: [
+    { path: "./Inter-Regular.ttf", weight: "400", style: "normal" },
+    { path: "./Inter-Bold.ttf", weight: "700", style: "normal" },
+  ],
   variable: "--font-sans",
+  display: "swap",
 });
 
 export const fontHeading = localFont({
