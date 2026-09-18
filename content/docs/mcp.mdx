@@ -1,9 +1,13 @@
 ---
 title: MCP Server
-description: Use AI agents to manage your entire GudCal scheduling operation via the Model Context Protocol. 18 tools for full agent autonomy.
+description: Use AI agents to manage GudCal via the Model Context Protocol. 21 tools for full agent autonomy.
 ---
 
-GudCal includes a built-in **Model Context Protocol (MCP)** server with 18 tools that allow AI agents to fully manage scheduling operations — from creating event types and setting availability to confirming bookings and managing API keys — all without the user ever touching the web interface.
+GudCal includes a built-in **Model Context Protocol (MCP)** server with **21 tools** that allow AI agents to manage scheduling — from creating event types and setting availability to confirming bookings and managing API keys.
+
+Public source and listing metadata live in **[gudlab/gudcal-core](https://github.com/gudlab/gudcal-core)** (`server.json`, `.mcp.json`). Do not point agents at the private `cavewebs/gudcal` repo.
+
+On **GudCal Cloud**, hosted MCP at `https://gudcal.com/api/mcp` is a **Team** plan feature ($20/mo). Self-hosting for your own org is allowed under BSL 1.1; offering a competing hosted Calendly is not.
 
 ## What is MCP?
 
@@ -15,7 +19,7 @@ The [Model Context Protocol](https://modelcontextprotocol.io/) is an open standa
 POST /api/mcp
 ```
 
-The MCP server uses HTTP transport with JSON-RPC messages.
+The MCP server uses HTTP transport (streamable HTTP) with JSON-RPC messages.
 
 ## Authentication
 
@@ -375,9 +379,11 @@ The user's booking page is now live at `gudcal.com/alex` and the Slack bot has i
 
 ## Configuring MCP Clients
 
-### Claude Desktop
+Official registry metadata: [`server.json`](https://github.com/gudlab/gudcal-core/blob/main/server.json) in the public repo. Cursor / Open Plugins: [`.mcp.json`](https://github.com/gudlab/gudcal-core/blob/main/.mcp.json).
 
-Add GudCal to your Claude Desktop MCP configuration (`~/Library/Application Support/Claude/claude_desktop_config.json`):
+### Cursor
+
+Project-level `.cursor/mcp.json` or global `~/.cursor/mcp.json`:
 
 ```json
 {
@@ -389,10 +395,22 @@ Add GudCal to your Claude Desktop MCP configuration (`~/Library/Application Supp
 }
 ```
 
-### Cursor / Other MCP Clients
+Cloud MCP is Team. Point `url` at `https://your-instance.example.com/api/mcp` when you self-host for your own org.
 
-Point your MCP client to `https://gudcal.com/api/mcp` (or your self-hosted URL) using HTTP transport.
+### Claude Desktop
+
+Add GudCal to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "gudcal": {
+      "url": "https://gudcal.com/api/mcp"
+    }
+  }
+}
+```
 
 ## Self-Hosting
 
-Self-hosted GudCal instances expose the MCP server at `/api/mcp` automatically. No additional configuration is needed — the MCP endpoint is available as soon as your instance is running.
+Self-hosted instances expose `POST /api/mcp` from this source. BSL 1.1 allows that for **your** organization. It does not allow you to productize a hosted Calendly competitor. Cloud Team gating on gudcal.com is unchanged.
