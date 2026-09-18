@@ -129,7 +129,7 @@ export function groupSlotsByGuestDate<T extends InstantSlot>(
     }
   }
 
-  const dates = [...byDate.keys()].sort();
+  const dates = Array.from(byDate.keys()).sort();
   return dates.map((date) => ({
     date,
     slots: (byDate.get(date) ?? []).sort((a, b) =>
