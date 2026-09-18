@@ -1,0 +1,18 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.gudlab/gudcal",
+  "title": "GudCal",
+  "description": "Source-available scheduling MCP: availability, bookings, event types. Repo: gudlab/gudcal-core.",
+  "version": "0.1.0",
+  "websiteUrl": "https://gudcal.com/docs/mcp",
+  "repository": {
+    "url": "https://github.com/gudlab/gudcal-core",
+    "source": "github"
+  },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://gudcal.com/api/mcp"
+    }
+  ]
+}
