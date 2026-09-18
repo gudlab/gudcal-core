@@ -276,7 +276,7 @@ export function BookingWidget({ eventType, user, rescheduleUid, prefillGuest }: 
     [eventType.slug, guestTimezone, user.username],
   );
 
-  // ── Calendar navigation ────────────────────────────────
+  // ── Calendar navigation ────────────────────────────────────
   const goToPrevMonth = () => {
     setViewMonth((prev) => {
       if (prev === 0) {
@@ -300,7 +300,7 @@ export function BookingWidget({ eventType, user, rescheduleUid, prefillGuest }: 
   const isPrevDisabled =
     viewYear === todayParts.year && viewMonth === todayParts.month;
 
-  // ── Date selection ─────────────────────────────────────
+  // ── Date selection ─────────────────────────────────────────
   const handleDateClick = (dateKey: string) => {
     setSelectedDate(dateKey);
 
@@ -318,7 +318,7 @@ export function BookingWidget({ eventType, user, rescheduleUid, prefillGuest }: 
     setStep("time");
   };
 
-  // ── Time selection ─────────────────────────────────────
+  // ── Time selection ─────────────────────────────────────────
   const handleSlotClick = (slot: TimeSlot) => {
     setSelectedSlot(slot);
     if (isReschedule) {
@@ -329,7 +329,7 @@ export function BookingWidget({ eventType, user, rescheduleUid, prefillGuest }: 
     }
   };
 
-  // ── Form submission ────────────────────────────────
+  // ── Form submission ────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedSlot) return;
@@ -373,7 +373,7 @@ export function BookingWidget({ eventType, user, rescheduleUid, prefillGuest }: 
     }
   };
 
-  // ── Reschedule submission ─────────────────────────
+  // ── Reschedule submission ─────────────────────────────────
   const handleRescheduleSubmit = async (slot: TimeSlot) => {
     if (!rescheduleUid || !prefillGuest) return;
 
@@ -411,7 +411,7 @@ export function BookingWidget({ eventType, user, rescheduleUid, prefillGuest }: 
     }
   };
 
-  // ── Calendar grid ──────────────────────────────────
+  // ── Calendar grid ──────────────────────────────────────────
   const daysInMonth = getDaysInMonth(viewYear, viewMonth);
   const firstDay = getFirstDayOfMonth(viewYear, viewMonth);
 
