@@ -3,6 +3,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { cn } from "@/lib/utils";
+import {
+  addDaysToDateKey,
+  formatDateKey,
+  formatDisplayDate,
+  formatDisplayTime,
+  groupSlotsByGuestDate,
+  zonedYmd,
+} from "@/lib/booking-dates";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -90,31 +98,6 @@ function getFirstDayOfMonth(year: number, month: number): number {
   return new Date(year, month, 1).getDay();
 }
 
-function formatDateKey(year: number, month: number, day: number): string {
-  return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-}
-
-function formatDisplayDate(dateStr: string, timezone: string): string {
-  const date = new Date(dateStr);
-  return date.toLocaleDateString("en-US", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    timeZone: timezone,
-  });
-}
-
-function formatDisplayTime(isoString: string, timezone: string): string {
-  const date = new Date(isoString);
-  return date.toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-    timeZone: timezone,
-  });
-}
-
 const LOCATION_LABELS: Record<string, string> = {
   IN_PERSON: "In Person",
   GOOGLE_MEET: "Google Meet",
@@ -154,10 +137,13 @@ export function BookingWidget({ eventType, user, rescheduleUid, prefillGuest }: 
   // Step management
   const [step, setStep] = useState<Step>("date");
 
-  // Calendar state
   const today = useMemo(() => new Date(), []);
-  const [viewYear, setViewYear] = useState(today.getFullYear());
-  const [viewMonth, setViewMonth] = useState(today.getMonth());
+  const todayParts = useMemo(
+    () => zonedYmd(today, guestTimezone),
+    [today, guestTimezone],
+  );
+  const [viewYear, setViewYear] = useState(todayParts.year);
+  const [viewMonth, setViewMonth] = useState(todayParts.month);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   // Month-level availability (pre-fetched)
@@ -200,8 +186,8 @@ export function BookingWidget({ eventType, user, rescheduleUid, prefillGuest }: 
         const params = new URLSearchParams({
           eventSlug: eventType.slug,
           timezone: guestTimezone,
-          from: firstDay,
-          to: lastDay,
+          from: addDaysToDateKey(firstDay, -1),
+          to: addDaysToDateKey(lastDay, 1),
         });
 
         const res = await fetch(
@@ -211,20 +197,18 @@ export function BookingWidget({ eventType, user, rescheduleUid, prefillGuest }: 
         if (!res.ok) throw new Error("Failed to load availability");
 
         const data: AvailabilityResponse = await res.json();
+        const grouped = groupSlotsByGuestDate(data.slots, guestTimezone);
 
-        // Build set of dates with available slots
         const datesWithSlots = new Set<string>();
         const slotsMap: Record<string, TimeSlot[]> = {};
 
-        for (const day of data.slots) {
-          if (day.slots.length > 0) {
-            datesWithSlots.add(day.date);
-            // Convert API slots to widget TimeSlot format
-            slotsMap[day.date] = day.slots.map((s) => ({
-              time: formatDisplayTime(s.start, guestTimezone),
-              dateTime: s.start,
-            }));
-          }
+        for (const day of grouped) {
+          if (day.slots.length === 0) continue;
+          datesWithSlots.add(day.date);
+          slotsMap[day.date] = day.slots.map((s) => ({
+            time: formatDisplayTime(s.start, guestTimezone),
+            dateTime: s.start,
+          }));
         }
 
         setAvailableDates(datesWithSlots);
@@ -255,7 +239,8 @@ export function BookingWidget({ eventType, user, rescheduleUid, prefillGuest }: 
 
       try {
         const params = new URLSearchParams({
-          date: dateKey,
+          from: addDaysToDateKey(dateKey, -1),
+          to: addDaysToDateKey(dateKey, 1),
           eventSlug: eventType.slug,
           timezone: guestTimezone,
         });
@@ -270,9 +255,8 @@ export function BookingWidget({ eventType, user, rescheduleUid, prefillGuest }: 
         }
 
         const data: AvailabilityResponse = await res.json();
-
-        // Find the specific day in the response
-        const dayData = data.slots.find((d) => d.date === dateKey);
+        const grouped = groupSlotsByGuestDate(data.slots, guestTimezone);
+        const dayData = grouped.find((d) => d.date === dateKey);
         if (dayData && dayData.slots.length > 0) {
           setSlots(
             dayData.slots.map((s) => ({
@@ -314,7 +298,7 @@ export function BookingWidget({ eventType, user, rescheduleUid, prefillGuest }: 
   };
 
   const isPrevDisabled =
-    viewYear === today.getFullYear() && viewMonth === today.getMonth();
+    viewYear === todayParts.year && viewMonth === todayParts.month;
 
   // ── Date selection ─────────────────────────────────────────
   const handleDateClick = (dateKey: string) => {
@@ -432,9 +416,9 @@ export function BookingWidget({ eventType, user, rescheduleUid, prefillGuest }: 
   const firstDay = getFirstDayOfMonth(viewYear, viewMonth);
 
   const todayKey = formatDateKey(
-    today.getFullYear(),
-    today.getMonth(),
-    today.getDate(),
+    todayParts.year,
+    todayParts.month,
+    todayParts.day,
   );
 
   const calendarCells: (number | null)[] = [];
@@ -572,13 +556,7 @@ export function BookingWidget({ eventType, user, rescheduleUid, prefillGuest }: 
 
                   const dateKey = formatDateKey(viewYear, viewMonth, day);
                   const isToday = dateKey === todayKey;
-                  const isPast =
-                    new Date(viewYear, viewMonth, day) <
-                    new Date(
-                      today.getFullYear(),
-                      today.getMonth(),
-                      today.getDate(),
-                    );
+                  const isPast = dateKey < todayKey;
                   const isUnavailable =
                     !monthLoading && !isPast && !availableDates.has(dateKey);
                   const isDisabled = isPast || isUnavailable;
@@ -589,6 +567,7 @@ export function BookingWidget({ eventType, user, rescheduleUid, prefillGuest }: 
                       key={dateKey}
                       type="button"
                       disabled={isDisabled}
+                      aria-label={formatDisplayDate(dateKey, guestTimezone)}
                       onClick={() => handleDateClick(dateKey)}
                       className={cn(
                         "mx-auto flex size-10 items-center justify-center rounded-full text-sm transition-colors",

@@ -14,7 +14,8 @@
     "preview": "next build --webpack && next start",
     "postinstall": "prisma generate",
     "email": "email dev --dir emails --port 3333",
-    "remove-content": "node ./setup.mjs"
+    "remove-content": "node ./setup.mjs",
+    "test": "tsx --test lib/booking-dates.test.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",
@@ -134,6 +135,7 @@
     "remark": "^15.0.1",
     "remark-gfm": "^4.0.0",
     "tailwindcss": "^4.1.18",
+    "tsx": "^4.23.13",
     "typescript": "^5.9.3",
     "unist-util-visit": "^5.0.0"
   }

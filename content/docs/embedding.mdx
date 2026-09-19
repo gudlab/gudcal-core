@@ -1,0 +1,138 @@
+---
+title: Embedding
+description: Embed your GudCal booking page on any website with an inline calendar, a popup, or a floating button. Shareable links work everywhere.
+---
+
+Every GudCal booking page is shareable and embeddable. You can share a direct
+link, drop an **inline** calendar into a page, open the booker in a **popup**,
+or add a **floating button** that follows the visitor as they scroll.
+
+The fastest way to get a ready-made snippet is the **Share & Embed** dialog in
+your dashboard: go to **Event Types**, click **Share** on any event, and open
+the **Embed** tab. Pick a type, set the theme/brand color, and copy the code.
+
+## Shareable links
+
+Each user and event type has a public URL:
+
+```
+https://your-gudcal-instance.com/{username}            # all public events
+https://your-gudcal-instance.com/{username}/{event-slug} # one event
+```
+
+These links are public, mobile-friendly, and work without an account.
+
+## The embed script
+
+All embed types are powered by a single, dependency-free script. It detects the
+host instance automatically from its own URL, so it works on self-hosted
+deployments without configuration:
+
+```html
+<script src="https://your-gudcal-instance.com/embed.js" async></script>
+```
+
+### Inline embed
+
+Renders the calendar directly inside an element on your page. Inline embeds
+**auto-resize** to fit their content.
+
+```html
+<div id="gudcal-inline"></div>
+<script src="https://your-gudcal-instance.com/embed.js" async></script>
+<script>
+  GudCal.inline({
+    username: "jane",
+    eventSlug: "intro-call",
+    target: "#gudcal-inline",
+    theme: "auto",        // "auto" | "light" | "dark"
+    brandColor: "#0069FF",
+    width: "100%",
+    height: "700px",      // omit or "auto" to auto-resize
+  });
+</script>
+```
+
+You can also use a data attribute — no JavaScript required:
+
+```html
+<div data-gudcal="jane" data-event="intro-call" data-theme="auto"></div>
+<script src="https://your-gudcal-instance.com/embed.js" async></script>
+```
+
+### Popup embed
+
+Opens the booker in a centered modal when a trigger element is clicked. Any
+element with `data-gudcal-popup` becomes a trigger automatically:
+
+```html
+<button data-gudcal-popup="jane" data-event="intro-call">
+  Book a meeting
+</button>
+<script src="https://your-gudcal-instance.com/embed.js" async></script>
+```
+
+Or wire it up manually:
+
+```html
+<script>
+  GudCal.popup({
+    username: "jane",
+    eventSlug: "intro-call",
+    trigger: "#my-button",
+  });
+</script>
+```
+
+The popup closes automatically a moment after a booking is completed.
+
+### Floating button
+
+Adds a fixed "Book a meeting" button to a corner of the page:
+
+```html
+<script src="https://your-gudcal-instance.com/embed.js" async></script>
+<script>
+  GudCal.floatingButton({
+    username: "jane",
+    eventSlug: "intro-call",
+    buttonText: "Book a meeting",
+    buttonColor: "#0069FF",
+    position: "bottom-right", // bottom-right | bottom-left | top-right | top-left
+  });
+</script>
+```
+
+## Options
+
+| Option        | Applies to        | Description                                          |
+| ------------- | ----------------- | ---------------------------------------------------- |
+| `username`    | all               | The host's username (required).                      |
+| `eventSlug`   | all               | Event-type slug. Omit to show the public profile.    |
+| `theme`       | all               | `auto`, `light`, or `dark`.                          |
+| `brandColor`  | all               | Hex color applied to buttons inside the widget.      |
+| `hideDetails` | inline            | Hide the host/event info sidebar (calendar only).    |
+| `target`      | inline            | CSS selector or element to render into.              |
+| `width`       | inline            | CSS width (default `100%`).                           |
+| `height`      | inline            | CSS height; omit for auto-resize.                    |
+| `trigger`     | popup             | Selector/element that opens the popup on click.      |
+| `buttonText`  | popup, floating   | Button label.                                        |
+| `buttonColor` | floating          | Button background color.                             |
+| `position`    | floating          | Corner placement of the button.                      |
+| `prefill`     | all               | `{ name, email, notes, guests }` to pre-fill fields. |
+
+## Pre-filling guest details
+
+Pass a `prefill` object (or add `?name=&email=` to a booking URL) to populate
+the guest form ahead of time:
+
+```html
+<script>
+  GudCal.popup({
+    username: "jane",
+    eventSlug: "intro-call",
+    trigger: "#book",
+    prefill: { name: "Sam Lee", email: "sam@example.com" },
+  });
+</script>
+```

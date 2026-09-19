@@ -1,23 +1,38 @@
 ---
 title: Self-Hosting
-description: Deploy GudCal on your own infrastructure.
+description: Deploy GudCal on your own infrastructure for your organization.
 ---
 
-GudCal is designed to be self-hosted. Run it on your own server, VPS, or container platform with full control over your data.
+GudCal is **source-available** under [Business Source License 1.1](https://github.com/gudlab/gudcal-core/blob/main/LICENSE.md). You can run it on your own server, VPS, or container platform with full control over your data.
+
+## License (read this first)
+
+**Allowed**
+
+- Self-host GudCal for **your own organization** or personal use
+- Modify the source for internal needs
+- Use scheduling inside a larger product where scheduling is not the primary offering
+
+**Not allowed**
+
+- Offer GudCal (or a substantially similar derivative) as a **competing hosted Calendly-style service** to third parties
+- Sell access to a hosted/managed GudCal
+
+On **18 February 2030** the licensed work converts to Apache 2.0. Until then, [gudcal.com](https://gudcal.com) is the commercial hosted product. Full text: [LICENSE.md](https://github.com/gudlab/gudcal-core/blob/main/LICENSE.md).
 
 ## Prerequisites
 
-- **Node.js** 18.17 or later
+- **Node.js** 18.17 or later (20.x from `.nvmrc` is what CI uses)
 - **PostgreSQL** 14 or later (Neon, Supabase, or self-hosted)
 - **pnpm** package manager
 
 ## Quick Start
 
-1. Clone the repository:
+1. Clone the **public** repository:
 
 ```bash
-git clone https://github.com/cavewebs/gudcal.git
-cd gudcal
+git clone https://github.com/gudlab/gudcal-core.git
+cd gudcal-core
 ```
 
 2. Install dependencies:
@@ -46,6 +61,8 @@ pnpm build
 pnpm start
 ```
 
+Docker Compose is usually faster for a first run — see the README.
+
 ## Environment Variables
 
 These are the required environment variables for self-hosting:
@@ -53,34 +70,35 @@ These are the required environment variables for self-hosting:
 | Variable | Description |
 |---|---|
 | `DATABASE_URL` | PostgreSQL connection string |
-| `NEXTAUTH_SECRET` | Random secret for session encryption |
+| `NEXTAUTH_SECRET` / `AUTH_SECRET` | Random secret for session encryption |
 | `NEXTAUTH_URL` | Your deployment URL (e.g. `https://cal.example.com`) |
 | `NEXT_PUBLIC_APP_URL` | Same as NEXTAUTH_URL |
-| `GOOGLE_CLIENT_ID` | Google OAuth client ID |
-| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
-| `ENCRYPTION_KEY` | 32-byte hex key for encrypting calendar tokens |
+| `ENCRYPTION_KEY` | 32-byte hex key (64 hex chars) for encrypting calendar tokens |
 
 ### Optional Variables
 
 | Variable | Description |
 |---|---|
-| `RESEND_API_KEY` | For sending email notifications |
-| `STRIPE_*` | For billing (not needed for self-hosted free usage) |
-| `GOOGLE_CALENDAR_CLIENT_ID` | For Google Calendar integration |
-| `GOOGLE_CALENDAR_CLIENT_SECRET` | For Google Calendar integration |
-| `CRON_SECRET` | Secret for the reminder cron endpoint |
-| `NEXT_PUBLIC_IS_SELF_HOSTED` | Set to `true` to disable cloud-only features |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google login |
+| `RESEND_API_KEY` | Transactional email |
+| `STRIPE_*` | Cloud billing only — omit for self-host |
+| `GOOGLE_CALENDAR_CLIENT_ID` / `SECRET` | Google Calendar sync |
+| `CRON_SECRET` | Reminder cron endpoint |
+| `NEXT_PUBLIC_IS_SELF_HOSTED` | Set to `true` on your instance |
 
 ## Self-Hosted vs Cloud
 
-When `NEXT_PUBLIC_IS_SELF_HOSTED=true`, the following features are disabled:
+Set `NEXT_PUBLIC_IS_SELF_HOSTED=true`. That **removes hosted plan caps** on core scheduling (event types, calendars, availability, organizations). It does **not** turn your box into GudCal Cloud.
 
-- Analytics dashboard
-- MCP server (Team plan feature)
-- AI features
-- Custom domains
+| | Your self-host (own org) | gudcal.com |
+|---|---|---|
+| Event types, bookings, calendars | Uncapped | Free / Pro / Team limits |
+| Organizations | Uncapped | **Team** ($20/mo) |
+| Hosted MCP at `gudcal.com/api/mcp` | n/a | **Team** |
+| `/api/mcp` on *your* URL | Ships in this source; BSL allows it for your org | Same codebase |
+| Analytics, custom domains | Hosted extras | Pro / Team |
 
-All core scheduling features work identically in both modes.
+Do not use a self-host to sell scheduling to other companies. That is the BSL restriction.
 
 ## Generating an Encryption Key
 

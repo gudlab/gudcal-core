@@ -41,6 +41,11 @@ export const docsConfig: DocsConfig = {
           href: "/docs/mcp",
           icon: "page",
         },
+        {
+          title: "Embedding",
+          href: "/docs/embedding",
+          icon: "page",
+        },
       ],
     },
     {

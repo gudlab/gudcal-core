@@ -8,6 +8,7 @@
 <p align="center">
   <a href="https://gudcal.com"><strong>Cloud</strong></a> ·
   <a href="https://gudcal.com/demo/meeting"><strong>Live demo</strong></a> ·
+  <a href="https://github.com/gudlab/gudcal-core"><strong>GitHub</strong></a> ·
   <a href="https://gudcal.com/docs"><strong>Docs</strong></a> ·
   <a href="#docker"><strong>Docker</strong></a>
 </p>
@@ -26,15 +27,27 @@
   <a href="https://vercel.com/new/clone?repository-url=https://github.com/gudlab/gudcal-core"><img src="https://vercel.com/button" alt="Deploy with Vercel" /></a>
 </p>
 
-If GudCal is useful, please **star this repo** — it is the fastest way to help the project get discovered.
+If this is useful, **[star this repo](https://github.com/gudlab/gudcal-core)** — it is the source-available edition. Issues and OSS PRs belong here, not on the private SaaS copy.
 
 ## Why GudCal
 
 - **Agent-first** — 21 MCP tools plus a REST API so an AI agent can run scheduling after you create one API key
 - **Calendly-simple** — event types, availability, buffers, timezone-aware public booking pages
 - **Calendar sync** — Google Calendar conflict detection and event creation
-- **Teams** — organizations with round-robin and collective scheduling
+- **Teams** — organizations with round-robin and collective scheduling (Team plan on cloud)
 - **Self-host or cloud** — Docker / Vercel, or use [gudcal.com](https://gudcal.com)
+
+## Cloud plans
+
+| | Free | Pro ($12/mo) | Team ($20/mo) |
+|---|---|---|---|
+| Event types | 3 | 20 | Unlimited |
+| Calendar connections | 1 | 5 | Unlimited |
+| Bookings | Unlimited | Unlimited | Unlimited |
+| Analytics / custom domains | — | Yes | Yes |
+| Organizations + hosted MCP | — | — | Yes |
+
+Self-hosting (`NEXT_PUBLIC_IS_SELF_HOSTED=true`) removes hosted plan caps on **core scheduling** for **your** org. BSL 1.1 does not allow offering GudCal as a competing hosted Calendly. Hosted MCP on gudcal.com stays Team.
 
 ## Quick start
 
@@ -48,7 +61,7 @@ pnpm prisma db push
 pnpm dev
 ```
 
-Visit `http://localhost:3000`.
+See [Self-Hosting](https://gudcal.com/docs/self-hosting) for Docker and production.
 
 ## Docker
 
@@ -75,22 +88,28 @@ docker run -p 3000:3000 \
   gudcal
 ```
 
-## Cloud vs self-host
-
-Hosted [gudcal.com](https://gudcal.com) has a Free plan (3 event types, 1 calendar, unlimited bookings), Pro at $12/mo, and Team at $20/mo (organizations + MCP).
-
-Self-hosting is for running **your** scheduling. The BSL 1.1 license does not allow offering GudCal as a competing hosted scheduling product. Change date: **18 Feb 2030** → Apache 2.0.
-
 ## MCP
 
-Point any MCP-compatible client at GudCal to list event types, read availability, and create or cancel bookings. Docs: https://gudcal.com/docs/mcp
+Point any MCP-compatible client at `https://gudcal.com/api/mcp` (Cloud **Team**) or at `/api/mcp` on your self-host.
 
-## Contributing
+- Docs: [gudcal.com/docs/mcp](https://gudcal.com/docs/mcp)
+- Registry manifest: [`server.json`](./server.json) (this public repo, not the private SaaS copy)
+- Cursor / Open Plugins: [`.mcp.json`](./.mcp.json)
 
-1. Open an issue first for anything larger than a typo
-2. Fork → feature branch → PR
-3. Docs and `good first issue` labels are the fastest path in
+```json
+{
+  "mcpServers": {
+    "gudcal": {
+      "url": "https://gudcal.com/api/mcp"
+    }
+  }
+}
+```
 
 ## License
 
-[Business Source License 1.1](LICENSE.md). You can self-host, modify, and use GudCal. You cannot offer it as a competing hosted scheduling service.
+[Business Source License 1.1](LICENSE.md). You can self-host for your own org. You cannot offer GudCal as a competing hosted scheduling service. Change date: **18 Feb 2030** → Apache 2.0.
+
+## Contributing
+
+Please read [CONTRIBUTING.md](CONTRIBUTING.md). Bug reports and small docs PRs are the fastest path in. Private → public sync is a documented script: `./scripts/sync-oss.sh`.

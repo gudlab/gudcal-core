@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "gudcal": {
+      "type": "streamable-http",
+      "url": "https://gudcal.com/api/mcp"
+    }
+  }
+}
