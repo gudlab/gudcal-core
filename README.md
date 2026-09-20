@@ -20,7 +20,19 @@
 </p>
 
 <p align="center">
-  <img src="https://www.gudcal.com/_static/images/light-preview.jpg" alt="GudCal dashboard" width="800" />
+  <a href="https://www.gudcal.com">
+    <img src="docs/assets/gudcal-hero.svg" alt="GudCal homepage" width="800" />
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://www.gudcal.com">
+    <img src="docs/assets/gudcal-tour.svg" alt="GudCal product tour" width="800" />
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://www.gudcal.com">Watch the full reel on gudcal.com</a>
 </p>
 
 <p align="center">
