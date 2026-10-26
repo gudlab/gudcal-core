@@ -103,28 +103,44 @@ export function buildBookingIcs(input: BookingIcsInput): string | null {
   return value.replace(/\r?\n/g, "\r\n");
 }
 
+/**
+ * Resend's JSON body expects attachment content as a Base64 string. A Node
+ * Buffer serializes as `{ type: "Buffer", data: [...] }`, which is not that
+ * documented shape.
+ */
 export function bookingIcsAttachment(
   ics: string,
   method: "REQUEST" | "CANCEL" = "REQUEST",
 ) {
   return {
     filename: method === "CANCEL" ? "cancel.ics" : "invite.ics",
-    content: Buffer.from(ics, "utf8"),
+    content: Buffer.from(ics, "utf8").toString("base64"),
     contentType: `text/calendar; charset=UTF-8; method=${method}`,
   };
 }
 
 export type IcsAttachment = ReturnType<typeof bookingIcsAttachment>;
 
+export function decodeIcsAttachmentContent(content: string): string {
+  return Buffer.from(content, "base64").toString("utf8");
+}
+
+export type RescheduleGuestIcsEmail = {
+  method: "CANCEL" | "REQUEST";
+  attachments: IcsAttachment[];
+};
+
 /**
- * Reschedule creates a new booking row (new UID). Attach CANCEL for the old
- * UID first, then REQUEST for the new UID, so the guest keeps one event.
+ * Reschedule creates a new booking row (new UID). Some calendar clients
+ * ignore METHOD:CANCEL when CANCEL and REQUEST share one email, so emit one
+ * guest email per ICS method: CANCEL (old confirmed UID) then REQUEST (new
+ * UID).
  */
-export function buildRescheduleIcsAttachments(input: {
+export function buildRescheduleGuestIcsEmails(input: {
   previous?: BookingIcsInput;
   next?: BookingIcsInput;
-}): IcsAttachment[] {
-  const attachments: IcsAttachment[] = [];
+}): RescheduleGuestIcsEmail[] {
+  const emails: RescheduleGuestIcsEmail[] = [];
 
   if (input.previous) {
     const ics = buildBookingIcs({
@@ -132,7 +148,12 @@ export function buildRescheduleIcsAttachments(input: {
       method: "CANCEL",
       sequence: input.previous.sequence ?? 1,
     });
-    if (ics) attachments.push(bookingIcsAttachment(ics, "CANCEL"));
+    if (ics) {
+      emails.push({
+        method: "CANCEL",
+        attachments: [bookingIcsAttachment(ics, "CANCEL")],
+      });
+    }
   }
 
   if (input.next) {
@@ -141,8 +162,13 @@ export function buildRescheduleIcsAttachments(input: {
       method: input.next.method ?? "REQUEST",
       sequence: input.next.sequence ?? 0,
     });
-    if (ics) attachments.push(bookingIcsAttachment(ics, "REQUEST"));
+    if (ics) {
+      emails.push({
+        method: "REQUEST",
+        attachments: [bookingIcsAttachment(ics, "REQUEST")],
+      });
+    }
   }
 
-  return attachments;
+  return emails;
 }
