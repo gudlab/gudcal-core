@@ -30,22 +30,26 @@ export type WriteBusyCheckResult =
   | { ok: false; status: 409; error: string }
   | { ok: false; status: 503; error: string };
 
+export type GoogleFreeBusyData = {
+  // googleapis types `calendars` as `T | null`, not only optional.
+  calendars?: Record<
+    string,
+    {
+      busy?: Array<{ start?: string | null; end?: string | null }>;
+      errors?: Array<{ reason?: string | null; domain?: string | null }>;
+    }
+  > | null;
+};
+
 /**
  * Google freebusy calendar payload. Errors are distinct from an empty busy list.
  */
 export function parseGoogleFreeBusy(
-  data: {
-    calendars?: Record<
-      string,
-      {
-        busy?: Array<{ start?: string | null; end?: string | null }>;
-        errors?: Array<{ reason?: string | null; domain?: string | null }>;
-      }
-    >;
-  },
+  data: GoogleFreeBusyData,
   calendarId: string,
 ): BusyInterval[] {
-  const calendar = data.calendars?.[calendarId];
+  const calendars = data.calendars ?? undefined;
+  const calendar = calendars?.[calendarId];
   if (!calendar) {
     throw new CalendarBusyLookupError(
       `Google free/busy response did not include calendar "${calendarId}"`,
@@ -75,7 +79,7 @@ export function parseGoogleFreeBusy(
  */
 export async function queryGoogleBusyTimes(
   connection: { calendarId: string | null } | null,
-  query: () => Promise<{ data: Parameters<typeof parseGoogleFreeBusy>[0] }>,
+  query: () => Promise<{ data: GoogleFreeBusyData }>,
 ): Promise<BusyInterval[]> {
   if (!connection) return [];
   if (!connection.calendarId) {
@@ -113,17 +117,23 @@ export function slotOverlapsBusy(
   );
 }
 
-export function excludeOverlappingBusy(
+/**
+ * Drop only the GudCal-created event for the booking being rescheduled.
+ *
+ * Free/busy has no event ids, so we match the original booking's exact
+ * start/end (the times GudCal wrote). A larger or partial overlap is some
+ * other Google event and must stay busy.
+ */
+export function excludeExactBusyInterval(
   busyPeriods: BusyInterval[],
   ignore: BusyInterval | undefined,
 ): BusyInterval[] {
   if (!ignore) return busyPeriods;
+  const ignoreStart = ignore.start.getTime();
+  const ignoreEnd = ignore.end.getTime();
   return busyPeriods.filter(
     (busy) =>
-      !areIntervalsOverlapping(
-        { start: busy.start, end: busy.end },
-        { start: ignore.start, end: ignore.end },
-      ),
+      busy.start.getTime() !== ignoreStart || busy.end.getTime() !== ignoreEnd,
   );
 }
 
@@ -165,8 +175,8 @@ export async function checkWriteAgainstCalendarBusy(
     end: Date;
     bufferBefore?: number;
     bufferAfter?: number;
-    /** Reschedule: ignore the Google event that occupies the original slot. */
-    ignoreBusyOverlapping?: BusyInterval;
+    /** Reschedule: drop only the exact original GudCal event interval. */
+    ignoreExactBusyInterval?: BusyInterval;
   },
   lookup: BusyLookup = getAllBusyTimes,
 ): Promise<WriteBusyCheckResult> {
@@ -189,9 +199,9 @@ export async function checkWriteAgainstCalendarBusy(
     throw error;
   }
 
-  const relevantBusy = excludeOverlappingBusy(
+  const relevantBusy = excludeExactBusyInterval(
     busy,
-    params.ignoreBusyOverlapping,
+    params.ignoreExactBusyInterval,
   );
 
   if (

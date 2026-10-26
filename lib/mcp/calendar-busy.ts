@@ -21,7 +21,7 @@ export async function mcpRefuseWriteIfCalendarBusy(
     end: Date;
     bufferBefore?: number;
     bufferAfter?: number;
-    ignoreBusyOverlapping?: BusyInterval;
+    ignoreExactBusyInterval?: BusyInterval;
   },
   lookup?: BusyLookup,
 ): Promise<{ content: { type: "text"; text: string }[]; isError: true } | null> {

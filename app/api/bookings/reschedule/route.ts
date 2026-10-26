@@ -94,10 +94,12 @@ export async function POST(request: Request) {
       end: newEndTime,
       bufferBefore: eventType.bufferBefore,
       bufferAfter: eventType.bufferAfter,
-      ignoreBusyOverlapping: {
-        start: originalBooking.startTime,
-        end: originalBooking.endTime,
-      },
+      ignoreExactBusyInterval: originalBooking.googleEventId
+        ? {
+            start: originalBooking.startTime,
+            end: originalBooking.endTime,
+          }
+        : undefined,
     });
     if (!calendarBusy.ok) {
       return NextResponse.json(

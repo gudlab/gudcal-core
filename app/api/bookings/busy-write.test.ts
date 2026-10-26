@@ -15,7 +15,8 @@ describe("HTTP booking write paths", () => {
     );
     assert.match(create, /checkWriteAgainstCalendarBusy/);
     assert.match(reschedule, /checkWriteAgainstCalendarBusy/);
-    assert.match(reschedule, /ignoreBusyOverlapping/);
+    assert.match(reschedule, /ignoreExactBusyInterval/);
+    assert.match(reschedule, /googleEventId/);
   });
 });
 

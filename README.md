@@ -75,6 +75,8 @@ pnpm dev
 
 Calendar token encryption uses `ENCRYPTION_KEY` (64 hex characters: `openssl rand -hex 32`). Set it before connecting Google Calendar and keep the same value across restarts. If it is unset, token encrypt/decrypt fails with a clear error instead of minting a random key.
 
+Upgrade note: older GudCal builds (and the Docker entrypoint) minted a random `ENCRYPTION_KEY` when it was unset. After this change that fallback is gone. If you already connected Google Calendar under a generated or missing key, set a persistent `ENCRYPTION_KEY` in `.env` / `.env.local` and reconnect Google Calendar. Stored tokens from the old key cannot be decrypted.
+
 When Google Calendar is connected, public availability and MCP `get_availability` exclude those busy times. A failed busy lookup is logged and treated as no extra busy on reads. Booking create, reschedule, and MCP `create_booking` reject overlapping busy time with HTTP 409, or HTTP 503 if the lookup fails. With no calendar connected, only GudCal bookings count as busy.
 
 See [Self-Hosting](https://gudcal.com/docs/self-hosting) for Docker and production.
@@ -100,9 +102,12 @@ docker build -t gudcal .
 docker run -p 3000:3000 \
   -e DATABASE_URL="postgres://..." \
   -e AUTH_SECRET="..." \
+  -e ENCRYPTION_KEY="$(openssl rand -hex 32)" \
   -e NEXT_PUBLIC_APP_URL="http://localhost:3000" \
   gudcal
 ```
+
+Reuse the same `ENCRYPTION_KEY` on later `docker run` invocations. Generating a new value on each start makes stored calendar tokens unreadable.
 
 ## MCP
 

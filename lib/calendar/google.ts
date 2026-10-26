@@ -1,7 +1,7 @@
 import { google } from "googleapis";
 import { prisma } from "@/lib/db";
 import { decrypt, encrypt } from "./encryption";
-import { queryGoogleBusyTimes } from "./busy";
+import { CalendarBusyLookupError, queryGoogleBusyTimes } from "./busy";
 
 export { decrypt, encrypt } from "./encryption";
 export { CalendarBusyLookupError } from "./busy";
@@ -134,14 +134,31 @@ export async function getBusyTimes(
   });
 
   return queryGoogleBusyTimes(connection, async () => {
+    const calendarId = connection?.calendarId;
+    if (!calendarId) {
+      throw new CalendarBusyLookupError(
+        "Google Calendar is connected but has no calendar ID",
+      );
+    }
+
     const calendar = await getGoogleCalendarClient(userId);
-    return calendar.freebusy.query({
+    const response = await calendar.freebusy.query({
       requestBody: {
         timeMin: startDate.toISOString(),
         timeMax: endDate.toISOString(),
-        items: [{ id: connection!.calendarId! }],
+        items: [{ id: calendarId }],
       },
     });
+
+    // googleapis types `calendars` as `{ [id]: ... } | null | undefined`.
+    const calendars = response.data.calendars;
+    if (calendars == null) {
+      throw new CalendarBusyLookupError(
+        "Google free/busy response did not include calendars",
+      );
+    }
+
+    return { data: { calendars } };
   });
 }
 

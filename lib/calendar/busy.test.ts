@@ -6,7 +6,7 @@ import {
   CalendarBusyLookupError,
   SLOT_UNAVAILABLE_ERROR,
   checkWriteAgainstCalendarBusy,
-  excludeOverlappingBusy,
+  excludeExactBusyInterval,
   getBusyTimesForRead,
   parseGoogleFreeBusy,
   queryGoogleBusyTimes,
@@ -50,6 +50,13 @@ describe("parseGoogleFreeBusy", () => {
   it("throws when the calendar is missing from the response", () => {
     assert.throws(
       () => parseGoogleFreeBusy({ calendars: {} }, "primary"),
+      CalendarBusyLookupError,
+    );
+  });
+
+  it("throws when calendars is null", () => {
+    assert.throws(
+      () => parseGoogleFreeBusy({ calendars: null }, "primary"),
       CalendarBusyLookupError,
     );
   });
@@ -147,9 +154,9 @@ describe("slotOverlapsBusy", () => {
   });
 });
 
-describe("excludeOverlappingBusy", () => {
-  it("drops the original booking's Google block on reschedule", () => {
-    const remaining = excludeOverlappingBusy(
+describe("excludeExactBusyInterval", () => {
+  it("drops only the GudCal event that matches the original booking times", () => {
+    const remaining = excludeExactBusyInterval(
       [slot],
       {
         start: new Date("2026-10-26T15:00:00.000Z"),
@@ -157,6 +164,15 @@ describe("excludeOverlappingBusy", () => {
       },
     );
     assert.deepEqual(remaining, []);
+  });
+
+  it("keeps unrelated Google busy that only overlaps the original slot", () => {
+    const other = {
+      start: new Date("2026-10-26T15:15:00.000Z"),
+      end: new Date("2026-10-26T16:00:00.000Z"),
+    };
+    const remaining = excludeExactBusyInterval([slot, other], slot);
+    assert.deepEqual(remaining, [other]);
   });
 });
 
@@ -195,17 +211,38 @@ describe("checkWriteAgainstCalendarBusy", () => {
     assert.deepEqual(result, { ok: true });
   });
 
-  it("ignores the original booking interval when rescheduling", async () => {
+  it("ignores the exact original GudCal interval when rescheduling", async () => {
     const result = await checkWriteAgainstCalendarBusy(
       {
         userId: "host",
         start: slot.start,
         end: slot.end,
-        ignoreBusyOverlapping: slot,
+        ignoreExactBusyInterval: slot,
       },
       async () => [slot],
     );
     assert.deepEqual(result, { ok: true });
+  });
+
+  it("still 409s when unrelated overlapping Google busy remains", async () => {
+    const other = {
+      start: new Date("2026-10-26T15:15:00.000Z"),
+      end: new Date("2026-10-26T16:00:00.000Z"),
+    };
+    const result = await checkWriteAgainstCalendarBusy(
+      {
+        userId: "host",
+        start: slot.start,
+        end: slot.end,
+        ignoreExactBusyInterval: slot,
+      },
+      async () => [slot, other],
+    );
+    assert.deepEqual(result, {
+      ok: false,
+      status: 409,
+      error: SLOT_UNAVAILABLE_ERROR,
+    });
   });
 });
 
