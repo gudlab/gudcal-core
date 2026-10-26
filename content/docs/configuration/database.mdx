@@ -30,13 +30,16 @@ Paste in your `.env` file:
 DATABASE_URL = "postgres://alex:AbC123dEf@ep-cool-darkness-123456.us-east-2.aws.neon.tech/dbname";
 ```
 
-### Generate Prisma client and push migrations
+### Generate the Prisma client and apply the schema
 
-Generate the Prisma client and push the schema to your database:
+Local development can use `db push`. Production and Docker use `migrate deploy`.
 
 ```bash
 pnpm prisma generate
-pnpm prisma db push
+pnpm prisma db push              # local-dev only
+# pnpm prisma migrate deploy     # production / self-host
 ```
+
+If the database was previously updated with `db push` and you are switching to Migrate, follow [UPGRADE.md](https://github.com/gudlab/gudcal-core/blob/main/UPGRADE.md) before `migrate deploy`.
 
 </Steps>

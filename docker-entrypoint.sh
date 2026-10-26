@@ -82,11 +82,17 @@ fi
 export __NEXT_PRIVATE_ORIGIN="${NEXT_PUBLIC_APP_URL:-http://localhost:3000}"
 
 # ─── Run database migrations ─────────────────────────────────
-echo "Applying database schema..."
-prisma db push --url "$DATABASE_URL" --schema ./prisma/schema.prisma 2>&1 || {
-  echo "WARNING: Database setup failed. The app may not work correctly."
-  echo "         Make sure PostgreSQL is running and DATABASE_URL is correct."
-}
+# Production / self-host uses migrate deploy (not db push).
+# Never pass --accept-data-loss. If this database was created with
+# `prisma db push`, follow UPGRADE.md before retrying.
+echo "Applying database migrations (prisma migrate deploy)..."
+if ! prisma migrate deploy; then
+  echo "ERROR: prisma migrate deploy failed."
+  echo "       Confirm PostgreSQL is reachable and DATABASE_URL is correct."
+  echo "       P3005 (schema is not empty) means this database was likely"
+  echo "       created with prisma db push. Read UPGRADE.md before retrying."
+  exit 1
+fi
 echo ""
 
 # ─── Start the application ───────────────────────────────────

@@ -15,9 +15,11 @@ Thanks for wanting to help. The public source-available repo is [gudlab/gudcal-c
 pnpm install
 cp .env.example .env.local
 pnpm prisma generate
-pnpm prisma db push
+pnpm prisma db push   # local-dev only; Docker / production use migrate deploy
 pnpm dev
 ```
+
+Production and self-host apply `prisma migrate deploy`. See [UPGRADE.md](UPGRADE.md) if the database was created with `db push`.
 
 Required env: `DATABASE_URL`, `NEXTAUTH_SECRET` / `AUTH_SECRET`, `NEXT_PUBLIC_APP_URL`, `ENCRYPTION_KEY` (64-char hex).
 

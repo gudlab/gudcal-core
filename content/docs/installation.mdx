@@ -48,12 +48,14 @@ RESEND_API_KEY=your-resend-api-key
 
 ### Set Up the Database
 
-GudCal uses PostgreSQL with Prisma. Generate the Prisma client and push the schema to your database:
+GudCal uses PostgreSQL with Prisma. For local development, generate the client and push the schema:
 
 ```bash
 pnpm prisma generate
 pnpm prisma db push
 ```
+
+`db push` is a local-dev shortcut. Production, Docker, and other self-host installs use `pnpm prisma migrate deploy`. Existing databases created with `db push` need a baseline step: [UPGRADE.md](https://github.com/gudlab/gudcal-core/blob/main/UPGRADE.md).
 
 <Callout type="warning" twClass="mt-4">
   Make sure your PostgreSQL database is running and the `DATABASE_URL` in your `.env.local` file is correct before running these commands.

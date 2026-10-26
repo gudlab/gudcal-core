@@ -51,8 +51,10 @@ cp .env.example .env.local
 
 ```bash
 pnpm prisma generate
-pnpm prisma db push
+pnpm prisma migrate deploy
 ```
+
+`db push` is a local-dev shortcut only. Production and Docker use `migrate deploy`. If this database was previously created with `db push`, baseline it first: [UPGRADE.md](https://github.com/gudlab/gudcal-core/blob/main/UPGRADE.md).
 
 5. Start the application:
 
