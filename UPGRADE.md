@@ -22,7 +22,7 @@ Docker Compose and the published image do this at container start. An empty volu
 
 ## Existing database previously managed with `db push`
 
-`db push` updates tables and does **not** write Prisma’s migration history. After this change, `migrate deploy` will try to run `20261026120000_baseline`. If those tables already exist, that run fails (relation already exists). That is expected. Do not reset the database.
+`db push` updates tables and does **not** write Prisma’s migration history. After this change, `migrate deploy` will try to run `20261026120000_baseline`. On a non-empty database with no history, Prisma 7 exits with **P3005** (`The database schema is not empty`). That is expected. Do not reset the database.
 
 ### 1. Confirm the live schema matches `schema.prisma`
 

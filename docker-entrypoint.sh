@@ -89,8 +89,8 @@ echo "Applying database migrations (prisma migrate deploy)..."
 if ! prisma migrate deploy; then
   echo "ERROR: prisma migrate deploy failed."
   echo "       Confirm PostgreSQL is reachable and DATABASE_URL is correct."
-  echo "       If this database was previously updated with prisma db push,"
-  echo "       read UPGRADE.md (baseline existing databases) before retrying."
+  echo "       P3005 (schema is not empty) means this database was likely"
+  echo "       created with prisma db push. Read UPGRADE.md before retrying."
   exit 1
 fi
 echo ""
