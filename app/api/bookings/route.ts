@@ -9,6 +9,7 @@ import {
   checkWriteAgainstCalendarBusy,
   getTimeOffBusyTimes,
 } from "@/lib/calendar/busy";
+import { refuseWriteIfInsideMinimumNotice } from "@/lib/booking-notice";
 import {
   slotOverlapsBusyTimes,
   TIME_OFF_OVERLAP_ERROR,
@@ -65,6 +66,17 @@ export async function POST(request: Request) {
     }
 
     const endTime = addMinutes(startTime, eventType.duration);
+
+    const notice = refuseWriteIfInsideMinimumNotice(
+      startTime,
+      eventType.minimumNotice,
+    );
+    if (notice) {
+      return NextResponse.json(
+        { error: notice.error },
+        { status: notice.status },
+      );
+    }
 
     // Resolve location from event type configuration
     const LOCATION_LABELS: Record<string, string> = {

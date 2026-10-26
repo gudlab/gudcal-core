@@ -43,6 +43,18 @@ describe("new event type minimumNotice default", () => {
     assert.doesNotMatch(body, /minimumNotice:\s*120/);
   });
 
+  it("API docs list the create default as 60 minutes", () => {
+    const docs = readFileSync("content/docs/api.mdx", "utf8");
+    assert.match(
+      docs,
+      /Minimum advance notice in minutes \(default: 60\)/,
+    );
+    assert.doesNotMatch(
+      docs,
+      /Minimum advance notice in minutes \(default: 120\)/,
+    );
+  });
+
   it("schema default is 60 minutes for new rows only (no data rewrite)", () => {
     const schema = readFileSync("prisma/schema.prisma", "utf8");
     assert.match(schema, /minimumNotice\s+Int\s+@default\(60\)/);
