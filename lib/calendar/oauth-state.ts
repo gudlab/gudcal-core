@@ -164,10 +164,22 @@ export function consumeOauthState(input: {
   return { ok: true, userId: verified.payload.userId };
 }
 
+function isPublicAppUrlHttps(): boolean {
+  const raw = (process.env.NEXT_PUBLIC_APP_URL ?? process.env.APP_URL ?? "").trim();
+  if (!raw) {
+    return false;
+  }
+  try {
+    return new URL(raw).protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 export function oauthNonceCookieOptions(maxAgeSeconds: number) {
   return {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: isPublicAppUrlHttps(),
     sameSite: "lax" as const,
     path: "/",
     maxAge: maxAgeSeconds,
