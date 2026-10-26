@@ -10,6 +10,40 @@ import { fromZonedTime } from "date-fns-tz";
 
 const DATE_KEY = /^(\d{4})-(\d{2})-(\d{2})$/;
 
+export function isDateKey(value: string): boolean {
+  return DATE_KEY.test(value);
+}
+
+export function isValidTimeZone(timeZone: string): boolean {
+  try {
+    Intl.DateTimeFormat("en-US", { timeZone });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** IANA zone or UTC when missing/invalid. Server-safe (no Intl detection). */
+export function resolveTimeZone(timeZone: string | null | undefined): string {
+  if (timeZone && isValidTimeZone(timeZone)) return timeZone;
+  return "UTC";
+}
+
+/**
+ * Browser/local IANA zone, or a valid candidate. Used by the public picker.
+ * Falls back to UTC — not America/New_York — when detection fails.
+ */
+export function resolveGuestTimeZone(candidate?: string | null): string {
+  if (candidate && isValidTimeZone(candidate)) return candidate;
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (tz && isValidTimeZone(tz)) return tz;
+  } catch {
+    // fall through
+  }
+  return "UTC";
+}
+
 /**
  * UTC instant of civil midnight (`00:00:00.000`) of `dateKey` in `timeZone`.
  * Do not wrap the result in date-fns `startOfDay` — that re-cuts in the
@@ -156,5 +190,28 @@ export function groupSlotsByGuestDate<T extends InstantSlot>(
     slots: (byDate.get(date) ?? []).sort((a, b) =>
       a.start.localeCompare(b.start),
     ),
+  }));
+}
+
+/** ISO slot payloads re-bucketed onto the guest calendar day. */
+export function isoSlotsByGuestDate(
+  daySlots: { date: string; slots: { start: Date; end: Date }[] }[],
+  guestTimezone: string,
+) {
+  return groupSlotsByGuestDate(
+    daySlots.map((day) => ({
+      date: day.date,
+      slots: day.slots.map((slot) => ({
+        start: slot.start.toISOString(),
+        end: slot.end.toISOString(),
+      })),
+    })),
+    guestTimezone,
+  ).map((day) => ({
+    date: day.date,
+    slots: day.slots.map((slot) => ({
+      start: slot.start,
+      end: slot.end ?? slot.start,
+    })),
   }));
 }
