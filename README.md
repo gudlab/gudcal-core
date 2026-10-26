@@ -66,8 +66,10 @@ Self-hosting (`NEXT_PUBLIC_IS_SELF_HOSTED=true`) removes hosted plan caps on **c
 ```bash
 git clone https://github.com/gudlab/gudcal-core.git
 cd gudcal-core
-pnpm install
 cp .env.example .env.local
+# Set DATABASE_URL before install. `pnpm install` runs `prisma generate`;
+# prisma.config.ts requires that variable (dotenv loads `.env`; export works too).
+pnpm install
 pnpm prisma generate
 pnpm prisma db push   # local-dev only
 pnpm dev
@@ -95,7 +97,7 @@ cp .env.example .env
 docker compose up -d
 ```
 
-GudCal listens on `http://localhost:3000`. The app entrypoint runs `prisma migrate deploy` against `DATABASE_URL`. If this database was previously updated with `prisma db push`, follow [UPGRADE.md](UPGRADE.md) before the container can apply migration history.
+GudCal listens on `http://localhost:3000`. The app entrypoint runs `prisma migrate deploy` against `DATABASE_URL`. If this database was previously updated with `prisma db push`, follow [UPGRADE.md](UPGRADE.md) before the container can apply migration history. When you record the baseline from Compose, bypass the entrypoint (`--entrypoint prisma`) so `migrate deploy` does not run first.
 
 ### Docker directly
 
