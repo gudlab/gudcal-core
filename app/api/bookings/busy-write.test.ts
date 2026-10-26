@@ -14,7 +14,10 @@ describe("HTTP booking write paths", () => {
       "utf8",
     );
     assert.match(create, /checkWriteAgainstCalendarBusy/);
+    assert.match(create, /getTimeOffBusyTimes/);
+    assert.match(create, /TIME_OFF_OVERLAP_ERROR/);
     assert.match(reschedule, /checkWriteAgainstCalendarBusy/);
+    assert.match(reschedule, /getTimeOffBusyTimes/);
     assert.match(reschedule, /ignoreExactBusyInterval/);
     assert.match(reschedule, /googleEventId/);
   });

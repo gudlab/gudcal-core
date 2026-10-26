@@ -15,7 +15,8 @@ describe("prisma baseline migration", () => {
       .map((entry) => entry.name)
       .sort();
 
-    assert.deepEqual(folders, [baselineName]);
+    assert.equal(folders[0], baselineName);
+    assert.ok(folders.every((name, index) => index === 0 || name > baselineName));
 
     const lock = readFileSync(join(migrationsDir, "migration_lock.toml"), "utf8");
     assert.match(lock, /provider\s*=\s*"postgresql"/);

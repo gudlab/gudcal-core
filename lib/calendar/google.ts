@@ -1,7 +1,15 @@
 import { google } from "googleapis";
+import type { CalendarConnection } from "@/app/generated/prisma/client";
 import { prisma } from "@/lib/db";
 import { decrypt, encrypt } from "./encryption";
 import { CalendarBusyLookupError, queryGoogleBusyTimes } from "./busy";
+import { mergeBusyIntervals } from "./connection-policy";
+import {
+  getPrimaryWriteConnection,
+  listSameProviderConnectionsForEvent,
+  saveCalendarConnection,
+} from "./connections";
+import { tryEventConnections } from "./connection-policy";
 
 export { decrypt, encrypt } from "./encryption";
 export { CalendarBusyLookupError } from "./busy";
@@ -24,7 +32,9 @@ export function getGoogleAuthUrl(state: string): string {
   return oauth2Client.generateAuthUrl({
     access_type: "offline",
     scope: SCOPES,
-    prompt: "consent",
+    // select_account forces the account picker so a second Google login
+    // is not silently reused. consent is required so we receive a refresh token.
+    prompt: "select_account consent",
     state,
   });
 }
@@ -45,52 +55,26 @@ export async function handleGoogleCallback(
   const calendar = google.calendar({ version: "v3", auth: oauth2Client });
   const calendarList = await calendar.calendarList.list();
   const primaryCalendar = calendarList.data.items?.find((c) => c.primary);
-  const email = primaryCalendar?.id ?? undefined;
+  const email = primaryCalendar?.id ?? null;
 
-  await prisma.calendarConnection.upsert({
-    where: {
-      userId_provider: { userId, provider: "GOOGLE" },
-    },
-    update: {
-      accessToken: encrypt(tokens.access_token),
-      refreshToken: tokens.refresh_token
-        ? encrypt(tokens.refresh_token)
-        : undefined,
-      expiresAt: tokens.expiry_date
-        ? new Date(tokens.expiry_date)
-        : undefined,
-      email,
-      calendarId: email,
-      isPrimary: true,
-    },
-    create: {
-      userId,
-      provider: "GOOGLE",
-      accessToken: encrypt(tokens.access_token),
-      refreshToken: tokens.refresh_token
-        ? encrypt(tokens.refresh_token)
-        : null,
-      expiresAt: tokens.expiry_date
-        ? new Date(tokens.expiry_date)
-        : null,
-      email,
-      calendarId: email,
-      isPrimary: true,
-    },
+  await saveCalendarConnection({
+    userId,
+    provider: "GOOGLE",
+    accessToken: encrypt(tokens.access_token),
+    refreshToken: tokens.refresh_token
+      ? encrypt(tokens.refresh_token)
+      : null,
+    expiresAt: tokens.expiry_date
+      ? new Date(tokens.expiry_date)
+      : null,
+    email,
+    calendarId: email,
   });
 }
 
-export async function getGoogleCalendarClient(userId: string) {
-  const connection = await prisma.calendarConnection.findUnique({
-    where: {
-      userId_provider: { userId, provider: "GOOGLE" },
-    },
-  });
-
-  if (!connection) {
-    throw new Error("No Google Calendar connection found");
-  }
-
+export async function getGoogleCalendarClientForConnection(
+  connection: CalendarConnection,
+) {
   const oauth2Client = getOAuth2Client();
   oauth2Client.setCredentials({
     access_token: decrypt(connection.accessToken),
@@ -102,7 +86,11 @@ export async function getGoogleCalendarClient(userId: string) {
 
   // Handle token refresh
   oauth2Client.on("tokens", async (tokens) => {
-    const updateData: any = {};
+    const updateData: {
+      accessToken?: string;
+      refreshToken?: string;
+      expiresAt?: Date;
+    } = {};
     if (tokens.access_token) {
       updateData.accessToken = encrypt(tokens.access_token);
     }
@@ -124,42 +112,71 @@ export async function getGoogleCalendarClient(userId: string) {
   return google.calendar({ version: "v3", auth: oauth2Client });
 }
 
+async function getGoogleConnectionForWrite(
+  userId: string,
+): Promise<CalendarConnection | null> {
+  const primary = await getPrimaryWriteConnection(userId);
+  if (primary?.provider === "GOOGLE") return primary;
+  return null;
+}
+
+export async function listGoogleCalendars(
+  connection: CalendarConnection,
+): Promise<{ id: string; summary: string; primary: boolean }[]> {
+  const calendar = await getGoogleCalendarClientForConnection(connection);
+  const calendarList = await calendar.calendarList.list();
+  return (calendarList.data.items ?? [])
+    .filter((c): c is typeof c & { id: string } => Boolean(c.id))
+    .map((c) => ({
+      id: c.id,
+      summary: c.summary ?? c.id,
+      primary: Boolean(c.primary),
+    }));
+}
+
 export async function getBusyTimes(
   userId: string,
   startDate: Date,
   endDate: Date
 ): Promise<{ start: Date; end: Date }[]> {
-  const connection = await prisma.calendarConnection.findUnique({
-    where: { userId_provider: { userId, provider: "GOOGLE" } },
+  const connections = await prisma.calendarConnection.findMany({
+    where: { userId, provider: "GOOGLE", includeInBusyCheck: true },
   });
 
-  return queryGoogleBusyTimes(connection, async () => {
-    const calendarId = connection?.calendarId;
-    if (!calendarId) {
-      throw new CalendarBusyLookupError(
-        "Google Calendar is connected but has no calendar ID",
-      );
-    }
+  if (connections.length === 0) return [];
 
-    const calendar = await getGoogleCalendarClient(userId);
-    const response = await calendar.freebusy.query({
-      requestBody: {
-        timeMin: startDate.toISOString(),
-        timeMax: endDate.toISOString(),
-        items: [{ id: calendarId }],
-      },
-    });
+  const batches = await Promise.all(
+    connections.map((connection) =>
+      queryGoogleBusyTimes(connection, async () => {
+        const calendarId = connection.calendarId;
+        if (!calendarId) {
+          throw new CalendarBusyLookupError(
+            "Google Calendar is connected but has no calendar ID",
+          );
+        }
 
-    // googleapis types `calendars` as `{ [id]: ... } | null | undefined`.
-    const calendars = response.data.calendars;
-    if (calendars == null) {
-      throw new CalendarBusyLookupError(
-        "Google free/busy response did not include calendars",
-      );
-    }
+        const calendar = await getGoogleCalendarClientForConnection(connection);
+        const response = await calendar.freebusy.query({
+          requestBody: {
+            timeMin: startDate.toISOString(),
+            timeMax: endDate.toISOString(),
+            items: [{ id: calendarId }],
+          },
+        });
 
-    return { data: { calendars } };
-  });
+        const calendars = response.data.calendars;
+        if (calendars == null) {
+          throw new CalendarBusyLookupError(
+            "Google free/busy response did not include calendars",
+          );
+        }
+
+        return { data: { calendars } };
+      }),
+    ),
+  );
+
+  return mergeBusyIntervals(batches.flat());
 }
 
 interface CalendarEventInput {
@@ -183,7 +200,10 @@ export async function createCalendarEvent(
   event: CalendarEventInput
 ): Promise<CalendarEventResult | null> {
   try {
-    const calendar = await getGoogleCalendarClient(userId);
+    const connection = await getGoogleConnectionForWrite(userId);
+    if (!connection) return null;
+    const calendar = await getGoogleCalendarClientForConnection(connection);
+    const calendarId = connection.calendarId ?? "primary";
 
     const eventData: any = {
       summary: event.summary,
@@ -216,7 +236,7 @@ export async function createCalendarEvent(
     }
 
     const response = await calendar.events.insert({
-      calendarId: "primary",
+      calendarId,
       requestBody: eventData,
       conferenceDataVersion: event.createMeetLink ? 1 : 0,
       sendUpdates: "all",
@@ -239,8 +259,10 @@ export async function updateCalendarEvent(
   eventId: string,
   event: Partial<CalendarEventInput>
 ): Promise<boolean> {
-  try {
-    const calendar = await getGoogleCalendarClient(userId);
+  const connections = await listSameProviderConnectionsForEvent(userId, "GOOGLE");
+  const result = await tryEventConnections(connections, async (connection) => {
+    const calendar = await getGoogleCalendarClientForConnection(connection);
+    const calendarId = connection.calendarId ?? "primary";
 
     const updateData: any = {};
     if (event.summary) updateData.summary = event.summary;
@@ -259,37 +281,43 @@ export async function updateCalendarEvent(
     }
 
     await calendar.events.patch({
-      calendarId: "primary",
+      calendarId,
       eventId,
       requestBody: updateData,
       sendUpdates: "all",
     });
 
     return true;
-  } catch (error) {
-    console.error("Error updating calendar event:", error);
-    return false;
+  });
+
+  if (result.ok) return true;
+  if (result.reason === "error") {
+    console.error("Error updating calendar event:", result.error);
   }
+  return false;
 }
 
 export async function deleteCalendarEvent(
   userId: string,
   eventId: string
 ): Promise<boolean> {
-  try {
-    const calendar = await getGoogleCalendarClient(userId);
-
+  const connections = await listSameProviderConnectionsForEvent(userId, "GOOGLE");
+  const result = await tryEventConnections(connections, async (connection) => {
+    const calendar = await getGoogleCalendarClientForConnection(connection);
     await calendar.events.delete({
-      calendarId: "primary",
+      calendarId: connection.calendarId ?? "primary",
       eventId,
       sendUpdates: "all",
     });
-
     return true;
-  } catch (error) {
-    console.error("Error deleting calendar event:", error);
-    return false;
+  });
+
+  if (result.ok) return true;
+  if (result.reason === "not_found") return true;
+  if (result.reason === "error") {
+    console.error("Error deleting calendar event:", result.error);
   }
+  return false;
 }
 
 export async function disconnectGoogleCalendar(userId: string): Promise<void> {

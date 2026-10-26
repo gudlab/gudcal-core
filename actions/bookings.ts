@@ -103,6 +103,7 @@ export async function cancelBooking(bookingId: string, reason?: string) {
     }
 
     revalidatePath("/dashboard/bookings");
+    revalidatePath("/dashboard");
 
     return { status: "success" as const };
   } catch (error) {
@@ -156,6 +157,7 @@ export async function confirmBooking(bookingId: string) {
     }
 
     revalidatePath("/dashboard/bookings");
+    revalidatePath("/dashboard");
 
     return { status: "success" as const };
   } catch (error) {

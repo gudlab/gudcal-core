@@ -64,6 +64,13 @@ enum WebhookEvent {
   MEETING_ENDED
 }
 
+enum TimeOffLabel {
+  HOLIDAY
+  SICK
+  AWAY
+  OTHER
+}
+
 // ─── EXISTING AUTH MODELS ─────────────────────────────────
 
 model Account {
@@ -147,6 +154,7 @@ model User {
   eventTypes          EventType[]
   bookingsAsHost      Booking[]            @relation("HostBookings")
   availabilities      Availability[]
+  timeOffs            TimeOff[]
   calendarConnections CalendarConnection[]
   webhooks            Webhook[]
   apiKeys             ApiKey[]
@@ -277,6 +285,24 @@ model DateOverride {
   @@map("date_overrides")
 }
 
+// ─── TIME OFF (user-level blocks) ─────────────────────────
+
+model TimeOff {
+  id        String       @id @default(cuid())
+  userId    String
+  startAt   DateTime
+  endAt     DateTime
+  allDay    Boolean
+  reason    String?
+  label     TimeOffLabel
+  createdAt DateTime     @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, startAt])
+  @@map("time_offs")
+}
+
 // ─── BOOKINGS ─────────────────────────────────────────────
 
 model Booking {
@@ -316,21 +342,23 @@ model Booking {
 // ─── CALENDAR CONNECTIONS ─────────────────────────────────
 
 model CalendarConnection {
-  id           String           @id @default(cuid())
-  userId       String
-  provider     CalendarProvider
-  accessToken  String           @db.Text
-  refreshToken String?          @db.Text
-  expiresAt    DateTime?
-  calendarId   String?          // specific calendar to check/write
-  isPrimary    Boolean          @default(false)
-  email        String?
-  createdAt    DateTime         @default(now()) @map("created_at")
-  updatedAt    DateTime         @updatedAt @map("updated_at")
+  id                 String           @id @default(cuid())
+  userId             String
+  provider           CalendarProvider
+  accessToken        String           @db.Text
+  refreshToken       String?          @db.Text
+  expiresAt          DateTime?
+  calendarId         String?          // calendar used for busy checks and (if primary) writes
+  includeInBusyCheck Boolean          @default(true)
+  isPrimary          Boolean          @default(false) // exactly one GOOGLE primary per user (write target)
+  email              String?
+  createdAt          DateTime         @default(now()) @map("created_at")
+  updatedAt          DateTime         @updatedAt @map("updated_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, provider])
+  @@index([userId, provider])
+  @@index([userId, isPrimary])
   @@map("calendar_connections")
 }
 

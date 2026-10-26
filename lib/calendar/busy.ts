@@ -1,9 +1,17 @@
 import { addMinutes, areIntervalsOverlapping } from "date-fns";
 
-export interface BusyInterval {
-  start: Date;
-  end: Date;
-}
+import { prisma } from "@/lib/db";
+import {
+  mergeBusyIntervals,
+  type BusyInterval,
+} from "@/lib/calendar/connection-policy";
+import {
+  timeOffOverlapWhere,
+  timeOffsToBusyIntervals,
+} from "@/lib/time-off";
+
+export type { BusyInterval };
+export { mergeBusyIntervals };
 
 export class CalendarBusyLookupError extends Error {
   constructor(message: string, options?: { cause?: unknown }) {
@@ -138,8 +146,24 @@ export function excludeExactBusyInterval(
 }
 
 /**
- * Busy times from every connected calendar for this host.
- * Google is the only provider today. No connection → []. Lookup failure throws.
+ * User-level TimeOff ranges. Same overlap rule as calendar busy times.
+ */
+export async function getTimeOffBusyTimes(
+  userId: string,
+  startDate: Date,
+  endDate: Date,
+): Promise<BusyInterval[]> {
+  const rows = await prisma.timeOff.findMany({
+    where: timeOffOverlapWhere(userId, startDate, endDate),
+    select: { startAt: true, endAt: true },
+  });
+  return timeOffsToBusyIntervals(rows);
+}
+
+/**
+ * Busy times from every selected Google connection plus TimeOff.
+ * Google is the only provider. Fail-closed: if any selected calendar
+ * cannot be queried, throws. No selected connections → TimeOff only.
  */
 export async function getAllBusyTimes(
   userId: string,
@@ -147,25 +171,52 @@ export async function getAllBusyTimes(
   to: Date,
 ): Promise<BusyInterval[]> {
   const { getBusyTimes } = await import("./google");
-  return getBusyTimes(userId, from, to);
+  const timeOffBusy = await getTimeOffBusyTimes(userId, from, to);
+  const googleBusy = await getBusyTimes(userId, from, to);
+  return mergeBusyIntervals([...googleBusy, ...timeOffBusy]);
 }
 
-/** Reads fail open: log a warning and treat the host as having no external busy. */
+/**
+ * Same as getAllBusyTimes, but calendar provider errors keep TimeOff busy.
+ */
+export async function getAllBusyTimesFailOpen(
+  userId: string,
+  from: Date,
+  to: Date,
+): Promise<BusyInterval[]> {
+  const timeOffBusy = await getTimeOffBusyTimes(userId, from, to);
+  try {
+    const { getBusyTimes } = await import("./google");
+    const googleBusy = await getBusyTimes(userId, from, to);
+    return mergeBusyIntervals([...googleBusy, ...timeOffBusy]);
+  } catch (error) {
+    console.warn("Calendar busy time fetch failed (fail-open):", error);
+    return mergeBusyIntervals(timeOffBusy);
+  }
+}
+
+/**
+ * Reads fail open. Injected lookups that throw return [].
+ * The default path keeps TimeOff when Google cannot be queried.
+ */
 export async function getBusyTimesForRead(
   userId: string,
   from: Date,
   to: Date,
   lookup: BusyLookup = getAllBusyTimes,
 ): Promise<BusyInterval[]> {
-  try {
-    return await lookup(userId, from, to);
-  } catch (error) {
-    console.warn(
-      "Calendar busy lookup failed; continuing without external busy times:",
-      error,
-    );
-    return [];
+  if (lookup !== getAllBusyTimes) {
+    try {
+      return await lookup(userId, from, to);
+    } catch (error) {
+      console.warn(
+        "Calendar busy lookup failed; continuing without external busy times:",
+        error,
+      );
+      return [];
+    }
   }
+  return getAllBusyTimesFailOpen(userId, from, to);
 }
 
 export async function checkWriteAgainstCalendarBusy(

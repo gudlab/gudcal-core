@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
+import { readFileSync } from "node:fs";
+
 import {
   CALENDAR_LOOKUP_UNAVAILABLE_ERROR,
   CalendarBusyLookupError,
@@ -243,6 +245,18 @@ describe("checkWriteAgainstCalendarBusy", () => {
       status: 409,
       error: SLOT_UNAVAILABLE_ERROR,
     });
+  });
+});
+
+describe("getAllBusyTimes includes TimeOff", () => {
+  it("folds TimeOff into the shared busy merge, not a parallel slot path", () => {
+    const src = readFileSync("lib/calendar/busy.ts", "utf8");
+    assert.match(src, /export async function getTimeOffBusyTimes/);
+    assert.match(src, /prisma\.timeOff\.findMany/);
+    assert.match(src, /timeOffsToBusyIntervals/);
+    assert.match(src, /export async function getAllBusyTimes/);
+    assert.match(src, /mergeBusyIntervals\(\[\.\.\.googleBusy, \.\.\.timeOffBusy\]\)/);
+    assert.match(src, /export async function getAllBusyTimesFailOpen/);
   });
 });
 

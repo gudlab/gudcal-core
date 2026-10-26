@@ -4,7 +4,7 @@ import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { format } from "date-fns";
-import type { Booking, EventType, BookingStatus } from "@/app/generated/prisma/client";
+import type { Booking, EventType } from "@/app/generated/prisma/client";
 import { toast } from "sonner";
 
 import { cancelBooking, confirmBooking } from "@/actions/bookings";
@@ -15,13 +15,19 @@ import {
 } from "@/components/ui/card";
 import { Icons } from "@/components/shared/icons";
 
-type BookingWithEventType = Booking & {
+type BookingWithEventType = Pick<
+  Booking,
+  "id" | "guestName" | "guestEmail" | "status" | "notes"
+> & {
+  startTime: Date | string;
+  endTime: Date | string;
   eventType: Pick<EventType, "title" | "duration" | "color" | "locationType">;
 };
 
 interface BookingCardProps {
   booking: BookingWithEventType;
   showActions?: boolean;
+  onActionComplete?: () => void;
 }
 
 const statusColors: Record<string, string> = {
@@ -32,7 +38,11 @@ const statusColors: Record<string, string> = {
   NO_SHOW: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400",
 };
 
-export function BookingCard({ booking, showActions = false }: BookingCardProps) {
+export function BookingCard({
+  booking,
+  showActions = false,
+  onActionComplete,
+}: BookingCardProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -43,6 +53,7 @@ export function BookingCard({ booking, showActions = false }: BookingCardProps) 
       const result = await cancelBooking(booking.id);
       if (result.status === "success") {
         toast.success("Booking cancelled");
+        onActionComplete?.();
         router.refresh();
       } else {
         toast.error(result.message);
@@ -55,6 +66,7 @@ export function BookingCard({ booking, showActions = false }: BookingCardProps) 
       const result = await confirmBooking(booking.id);
       if (result.status === "success") {
         toast.success("Booking confirmed");
+        onActionComplete?.();
         router.refresh();
       } else {
         toast.error(result.message);

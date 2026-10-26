@@ -5,7 +5,15 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { buildBookingEmailData, sendBookingConfirmation } from "@/lib/emails";
 import { createCalendarEventForBooking } from "@/lib/calendar/google";
-import { checkWriteAgainstCalendarBusy } from "@/lib/calendar/busy";
+import {
+  checkWriteAgainstCalendarBusy,
+  getTimeOffBusyTimes,
+} from "@/lib/calendar/busy";
+import {
+  slotOverlapsBusyTimes,
+  TIME_OFF_OVERLAP_ERROR,
+  timeOffOverlapWhere,
+} from "@/lib/time-off";
 
 const additionalGuestSchema = z.object({
   name: z.string().min(1).max(200),
@@ -85,6 +93,18 @@ export async function POST(request: Request) {
       );
     }
 
+    const timeOffBusyTimes = await getTimeOffBusyTimes(
+      eventType.userId,
+      startTime,
+      endTime,
+    );
+    if (slotOverlapsBusyTimes(startTime, endTime, timeOffBusyTimes)) {
+      return NextResponse.json(
+        { error: TIME_OFF_OVERLAP_ERROR },
+        { status: 409 },
+      );
+    }
+
     const calendarBusy = await checkWriteAgainstCalendarBusy({
       userId: eventType.userId,
       start: startTime,
@@ -121,6 +141,14 @@ export async function POST(request: Request) {
       );
 
       if (hasConflict) {
+        return null;
+      }
+
+      const overlappingTimeOff = await tx.timeOff.findFirst({
+        where: timeOffOverlapWhere(eventType.userId, startTime, endTime),
+        select: { id: true },
+      });
+      if (overlappingTimeOff) {
         return null;
       }
 

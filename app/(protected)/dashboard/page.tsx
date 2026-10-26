@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { addDays, format } from "date-fns";
+import { addDays, addMonths, format, startOfMonth } from "date-fns";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/card";
 import { Icons } from "@/components/shared/icons";
 import { DashboardBookingLink } from "@/components/dashboard/dashboard-booking-link";
+import { ScheduleCalendar } from "@/components/dashboard/schedule-calendar";
 
 export const metadata = constructMetadata({
   title: "Dashboard \u2013 GudCal",
@@ -30,10 +31,22 @@ export default async function DashboardPage() {
   const user = session.user;
   const now = new Date();
   const weekFromNow = addDays(now, 7);
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+  const monthBegin = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+  const calendarFrom = startOfMonth(addMonths(now, -2));
+  const calendarTo = addMonths(startOfMonth(now), 10);
 
-  const [upcomingCount, pendingCount, monthlyBookings, activeEventTypes, nextBookings] =
+  const [
+    upcomingCount,
+    pendingCount,
+    monthlyBookings,
+    activeEventTypes,
+    nextBookings,
+    calendarBookings,
+    timeOffs,
+    defaultAvailability,
+    userRow,
+  ] =
     await Promise.all([
       prisma.booking.count({
         where: {
@@ -48,7 +61,7 @@ export default async function DashboardPage() {
       prisma.booking.count({
         where: {
           userId,
-          startTime: { gte: startOfMonth, lte: endOfMonth },
+          startTime: { gte: monthBegin, lte: monthEnd },
           status: { in: ["CONFIRMED", "PENDING"] },
         },
       }),
@@ -68,6 +81,36 @@ export default async function DashboardPage() {
         },
         orderBy: { startTime: "asc" },
         take: 5,
+      }),
+      prisma.booking.findMany({
+        where: {
+          userId,
+          startTime: { lt: calendarTo },
+          endTime: { gt: calendarFrom },
+          status: { in: ["CONFIRMED", "PENDING"] },
+        },
+        include: {
+          eventType: {
+            select: { title: true, duration: true, color: true, locationType: true },
+          },
+        },
+        orderBy: { startTime: "asc" },
+      }),
+      prisma.timeOff.findMany({
+        where: {
+          userId,
+          startAt: { lt: calendarTo },
+          endAt: { gt: calendarFrom },
+        },
+        orderBy: { startAt: "asc" },
+      }),
+      prisma.availability.findFirst({
+        where: { userId, isDefault: true },
+        include: { rules: true },
+      }),
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { timezone: true, weekStart: true },
       }),
     ]);
 
@@ -157,6 +200,44 @@ export default async function DashboardPage() {
           );
         })}
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Calendar</CardTitle>
+          <CardDescription>
+            Confirmed and pending bookings, plus time off. Click a booking to manage it, or drag an empty range to block time.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ScheduleCalendar
+            bookings={calendarBookings.map((booking) => ({
+              id: booking.id,
+              guestName: booking.guestName,
+              guestEmail: booking.guestEmail,
+              startTime: booking.startTime.toISOString(),
+              endTime: booking.endTime.toISOString(),
+              status: booking.status,
+              notes: booking.notes,
+              eventType: booking.eventType,
+            }))}
+            timeOffs={timeOffs.map((block) => ({
+              id: block.id,
+              startAt: block.startAt.toISOString(),
+              endAt: block.endAt.toISOString(),
+              allDay: block.allDay,
+              reason: block.reason,
+              label: block.label,
+            }))}
+            workingHours={(defaultAvailability?.rules ?? []).map((rule) => ({
+              dayOfWeek: rule.dayOfWeek,
+              startTime: rule.startTime,
+              endTime: rule.endTime,
+            }))}
+            timezone={userRow?.timezone ?? "America/New_York"}
+            weekStartsOn={userRow?.weekStart === 1 ? 1 : 0}
+          />
+        </CardContent>
+      </Card>
 
       {/* Upcoming meetings */}
       <Card>
