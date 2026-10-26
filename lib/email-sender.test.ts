@@ -46,6 +46,12 @@ describe("bookingMailbox", () => {
       assert.equal(bookingMailbox(), "noreply@mailman.gudcal.com");
     });
   });
+
+  it("falls back when the EMAIL_FROM bracket mailbox has no @", () => {
+    withEmailFrom("GudCal <not-an-address>", () => {
+      assert.equal(bookingMailbox(), "noreply@mailman.gudcal.com");
+    });
+  });
 });
 
 describe("bookingFromAddress", () => {
@@ -95,6 +101,14 @@ describe("invite-sender call sites", () => {
       reschedule,
       /calendarInviteSent: newBooking\.status !== "CONFIRMED"/,
     );
+    assert.match(reschedule, /previousInvite:/);
+    assert.match(reschedule, /originalBooking\.status === "CONFIRMED"/);
+    assert.match(reschedule, /uid: originalBooking\.uid/);
+
+    const emails = readFileSync("lib/emails.ts", "utf8");
+    assert.match(emails, /rescheduleGuestIcsAttachments/);
+    assert.match(emails, /buildRescheduleIcsAttachments/);
+    assert.match(emails, /method: "CANCEL", sequence: 1/);
     assert.match(
       actions,
       /calendarInviteSent: updatedBooking\.status !== "CONFIRMED"/,

@@ -9,8 +9,9 @@ function rawFromAddress(): string {
 export function bookingMailbox(): string {
   const raw = rawFromAddress();
   const bracket = raw.match(/<([^>]+)>/);
-  if (bracket?.[1]) return bracket[1].trim();
-  if (raw.includes("@") && !raw.includes("<")) return raw;
+  const candidate = bracket?.[1]?.trim()
+    ?? (raw.includes("@") && !raw.includes("<") ? raw.trim() : "");
+  if (candidate.includes("@")) return candidate;
   return DEFAULT_MAILBOX;
 }
 

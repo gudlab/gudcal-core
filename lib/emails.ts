@@ -3,7 +3,12 @@ import { toZonedTime } from "date-fns-tz";
 
 import { resend } from "@/lib/email";
 import { bookingFromAddress } from "@/lib/email-sender";
-import { bookingIcsAttachment, buildBookingIcs } from "@/lib/calendar/ics";
+import {
+  bookingIcsAttachment,
+  buildBookingIcs,
+  buildRescheduleIcsAttachments,
+  type BookingIcsInput,
+} from "@/lib/calendar/ics";
 import { handleResendSendResult } from "@/lib/resend-result";
 
 import BookingConfirmationEmail from "@/emails/booking-confirmation";
@@ -37,6 +42,12 @@ export interface BookingEmailData {
 export interface RescheduleEmailData extends BookingEmailData {
   oldDateStr: string;
   oldTimeStr: string;
+  /** Confirmed original booking whose ICS UID the guest already has. */
+  previousInvite?: {
+    uid: string;
+    startTime: Date;
+    endTime: Date;
+  };
 }
 
 /**
@@ -103,14 +114,12 @@ export function buildBookingEmailData(booking: {
   };
 }
 
-function guestIcsAttachments(
+function toBookingIcsInput(
   data: BookingEmailData,
-  method: "REQUEST" | "CANCEL" = "REQUEST",
-) {
-  if (data.calendarInviteSent) return undefined;
-  if (!data.startTime || !data.endTime) return undefined;
-
-  const ics = buildBookingIcs({
+  overrides: Partial<BookingIcsInput> = {},
+): BookingIcsInput | null {
+  if (!data.startTime || !data.endTime) return null;
+  return {
     uid: data.bookingUid,
     title: `${data.eventTitle} with ${data.hostName}`,
     description: data.notes,
@@ -122,10 +131,45 @@ function guestIcsAttachments(
     guestName: data.guestName,
     guestEmail: data.guestEmail,
     additionalGuests: data.additionalGuestEmails?.map((email) => ({ email })),
+    ...overrides,
+  };
+}
+
+function guestIcsAttachments(
+  data: BookingEmailData,
+  method: "REQUEST" | "CANCEL" = "REQUEST",
+) {
+  if (data.calendarInviteSent) return undefined;
+  const input = toBookingIcsInput(data, {
     method,
+    sequence: method === "CANCEL" ? 1 : 0,
   });
+  if (!input) return undefined;
+
+  const ics = buildBookingIcs(input);
   if (!ics) return undefined;
   return [bookingIcsAttachment(ics, method)];
+}
+
+function rescheduleGuestIcsAttachments(data: RescheduleEmailData) {
+  const previous = data.previousInvite
+    ? toBookingIcsInput(
+        {
+          ...data,
+          bookingUid: data.previousInvite.uid,
+          startTime: data.previousInvite.startTime,
+          endTime: data.previousInvite.endTime,
+          calendarInviteSent: false,
+        },
+        { method: "CANCEL", sequence: 1 },
+      )
+    : undefined;
+  const next = data.calendarInviteSent ? null : toBookingIcsInput(data);
+
+  return buildRescheduleIcsAttachments({
+    ...(previous && { previous }),
+    ...(next && { next }),
+  });
 }
 
 export async function sendBookingConfirmation(data: BookingEmailData) {
@@ -241,9 +285,15 @@ export async function sendBookingReminder(data: Omit<BookingEmailData, "cancelRe
 }
 
 export async function sendBookingRescheduled(data: RescheduleEmailData) {
-  const { guestEmail, hostEmail, additionalGuestEmails, ...rest } = data;
+  const {
+    guestEmail,
+    hostEmail,
+    additionalGuestEmails,
+    previousInvite: _previousInvite,
+    ...rest
+  } = data;
   const from = bookingFromAddress(data.hostName);
-  const attachments = guestIcsAttachments(data);
+  const attachments = rescheduleGuestIcsAttachments(data);
 
   try {
     // Send to guest (CC additional guests)
@@ -252,7 +302,7 @@ export async function sendBookingRescheduled(data: RescheduleEmailData) {
       to: guestEmail,
       ...(hostEmail && { replyTo: hostEmail }),
       ...(additionalGuestEmails?.length && { cc: additionalGuestEmails }),
-      ...(attachments && { attachments }),
+      ...(attachments.length && { attachments }),
       subject: `Booking rescheduled: ${data.eventTitle} with ${data.hostName}`,
       react: BookingRescheduledEmail({ ...rest, isHost: false }),
     });

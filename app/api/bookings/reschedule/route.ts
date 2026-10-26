@@ -232,6 +232,13 @@ export async function POST(request: Request) {
         ...newEmailData,
         oldDateStr: format(oldGuestStart, "EEEE, MMMM d, yyyy"),
         oldTimeStr: `${format(oldGuestStart, "h:mm a")} - ${format(oldGuestEnd, "h:mm a")}`,
+        ...(originalBooking.status === "CONFIRMED" && {
+          previousInvite: {
+            uid: originalBooking.uid,
+            startTime: originalBooking.startTime,
+            endTime: originalBooking.endTime,
+          },
+        }),
       }).catch(() => {});
     }
 

@@ -12,6 +12,14 @@ function toUtcDateArray(date: Date): DateArray {
   ];
 }
 
+function sanitizeIcsName(name: string): string {
+  return name.replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
+export function bookingIcsUid(bookingUid: string): string {
+  return `${bookingUid}@gudcal.com`;
+}
+
 export type BookingIcsInput = {
   uid: string;
   title: string;
@@ -36,7 +44,8 @@ export type BookingIcsInput = {
  */
 export function buildBookingIcs(input: BookingIcsInput): string | null {
   const mailbox = bookingMailbox();
-  const hostName = input.hostName.trim() || "GudCal";
+  const hostName = sanitizeIcsName(input.hostName) || "GudCal";
+  const guestName = sanitizeIcsName(input.guestName) || input.guestEmail;
   const durationMinutes = Math.max(
     1,
     Math.round((input.end.getTime() - input.start.getTime()) / 60000),
@@ -47,7 +56,7 @@ export function buildBookingIcs(input: BookingIcsInput): string | null {
   );
 
   const { error, value } = createEvent({
-    uid: `${input.uid}@gudcal.com`,
+    uid: bookingIcsUid(input.uid),
     productId: "-//GudCal//Booking//EN",
     title: input.title,
     description: input.description,
@@ -71,14 +80,14 @@ export function buildBookingIcs(input: BookingIcsInput): string | null {
         rsvp: false,
       },
       {
-        name: input.guestName,
+        name: guestName,
         email: input.guestEmail,
         partstat: input.method === "CANCEL" ? "DECLINED" : "NEEDS-ACTION",
         role: "REQ-PARTICIPANT",
         rsvp: true,
       },
       ...additional.map((g) => ({
-        name: g.name || g.email,
+        name: sanitizeIcsName(g.name || "") || g.email,
         email: g.email,
         partstat: "NEEDS-ACTION" as const,
         role: "REQ-PARTICIPANT" as const,
@@ -103,4 +112,37 @@ export function bookingIcsAttachment(
     content: Buffer.from(ics, "utf8"),
     contentType: `text/calendar; charset=UTF-8; method=${method}`,
   };
+}
+
+export type IcsAttachment = ReturnType<typeof bookingIcsAttachment>;
+
+/**
+ * Reschedule creates a new booking row (new UID). Attach CANCEL for the old
+ * UID first, then REQUEST for the new UID, so the guest keeps one event.
+ */
+export function buildRescheduleIcsAttachments(input: {
+  previous?: BookingIcsInput;
+  next?: BookingIcsInput;
+}): IcsAttachment[] {
+  const attachments: IcsAttachment[] = [];
+
+  if (input.previous) {
+    const ics = buildBookingIcs({
+      ...input.previous,
+      method: "CANCEL",
+      sequence: input.previous.sequence ?? 1,
+    });
+    if (ics) attachments.push(bookingIcsAttachment(ics, "CANCEL"));
+  }
+
+  if (input.next) {
+    const ics = buildBookingIcs({
+      ...input.next,
+      method: input.next.method ?? "REQUEST",
+      sequence: input.next.sequence ?? 0,
+    });
+    if (ics) attachments.push(bookingIcsAttachment(ics, "REQUEST"));
+  }
+
+  return attachments;
 }
