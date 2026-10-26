@@ -135,7 +135,7 @@ Returns all event types for the authenticated user (including inactive ones).
     "requiresConfirmation": false,
     "bufferBefore": 5,
     "bufferAfter": 5,
-    "minimumNotice": 120,
+    "minimumNotice": 60,
     "maxBookingsPerDay": null,
     "slotInterval": null,
     "color": "#0069FF",
@@ -188,7 +188,7 @@ POST /api/v1/event-types
 | `requiresConfirmation` | boolean | no | Require manual confirmation (default: false) |
 | `bufferBefore` | number | no | Buffer before in minutes (default: 0) |
 | `bufferAfter` | number | no | Buffer after in minutes (default: 0) |
-| `minimumNotice` | number | no | Minimum advance notice in minutes (default: 120) |
+| `minimumNotice` | number | no | Minimum advance notice in minutes (default: 60) |
 | `maxBookingsPerDay` | number | no | Max bookings per day (null = unlimited) |
 | `slotInterval` | number | no | Custom slot interval in minutes |
 | `color` | string | no | Hex color (default: #0069FF) |

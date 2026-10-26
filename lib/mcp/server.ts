@@ -10,6 +10,7 @@ import {
   zonedEndOfDay,
   zonedStartOfDay,
 } from "@/lib/booking-dates";
+import { refuseWriteIfInsideMinimumNotice } from "@/lib/booking-notice";
 import {
   mcpLoadAvailabilityBusyTimes,
   mcpRefuseWriteIfCalendarBusy,
@@ -311,6 +312,14 @@ export function createMcpServer() {
 
       if (startTime < new Date()) {
         return errorResponse("Cannot book a time in the past.");
+      }
+
+      const notice = refuseWriteIfInsideMinimumNotice(
+        startTime,
+        eventType.minimumNotice,
+      );
+      if (notice) {
+        return errorResponse(notice.error, true);
       }
 
       const endTime = addMinutes(startTime, eventType.duration);
@@ -639,7 +648,7 @@ export function createMcpServer() {
         .number()
         .min(0)
         .optional()
-        .describe("Minimum advance notice in minutes (default: 120)"),
+        .describe("Minimum advance notice in minutes (default: 60)"),
       maxBookingsPerDay: z
         .number()
         .min(1)

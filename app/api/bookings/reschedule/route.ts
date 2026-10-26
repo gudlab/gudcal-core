@@ -14,6 +14,7 @@ import {
   checkWriteAgainstCalendarBusy,
   getTimeOffBusyTimes,
 } from "@/lib/calendar/busy";
+import { refuseWriteIfInsideMinimumNotice } from "@/lib/booking-notice";
 import { slotOverlapsBusyTimes, TIME_OFF_OVERLAP_ERROR } from "@/lib/time-off";
 
 const rescheduleSchema = z.object({
@@ -91,6 +92,17 @@ export async function POST(request: Request) {
     }
 
     const newEndTime = addMinutes(newStartTime, eventType.duration);
+
+    const notice = refuseWriteIfInsideMinimumNotice(
+      newStartTime,
+      eventType.minimumNotice,
+    );
+    if (notice) {
+      return NextResponse.json(
+        { error: notice.error },
+        { status: notice.status },
+      );
+    }
 
     const timeOffBusyTimes = await getTimeOffBusyTimes(
       originalBooking.userId,

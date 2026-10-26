@@ -217,7 +217,7 @@ model EventType {
   bufferBefore         Int               @default(0) // minutes
   bufferAfter          Int               @default(0) // minutes
   maxBookingsPerDay    Int?
-  minimumNotice        Int               @default(120) // minutes (2 hours default)
+  minimumNotice        Int               @default(60) // minutes (1 hour default for new rows only)
   slotInterval         Int?              // null = use duration as interval
   schedulingType       SchedulingKind    @default(INDIVIDUAL)
   price                Int?              // cents, for paid bookings

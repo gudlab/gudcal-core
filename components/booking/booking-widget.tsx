@@ -12,6 +12,16 @@ import {
   resolveGuestTimeZone,
   zonedYmd,
 } from "@/lib/booking-dates";
+import {
+  NEXT_AVAILABLE_LOOKAHEAD_MONTHS,
+  NO_TIMES_LEFT_TODAY,
+  formatSlotDateInTimeZone,
+  guestDaysFromAvailability,
+  monthAvailabilityRange,
+  nextAvailableDateKey,
+  nextLookaheadMonth,
+  todayEmptyHint,
+} from "@/lib/booking-slots-ux";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -153,6 +163,9 @@ export function BookingWidget({
   const [availableDates, setAvailableDates] = useState<Set<string>>(new Set());
   const [monthSlots, setMonthSlots] = useState<Record<string, TimeSlot[]>>({});
   const [monthLoading, setMonthLoading] = useState(true);
+  const [hintDates, setHintDates] = useState<Set<string>>(new Set());
+  const [hintSlots, setHintSlots] = useState<Record<string, TimeSlot[]>>({});
+  const [hintFetching, setHintFetching] = useState(false);
 
   // Time slots (for selected date)
   const [slots, setSlots] = useState<TimeSlot[]>([]);
@@ -196,59 +209,116 @@ export function BookingWidget({
     }
   };
 
+  const loadMonthDays = useCallback(
+    async (year: number, month: number) => {
+      const { from, to } = monthAvailabilityRange(year, month);
+      const params = new URLSearchParams({
+        eventSlug: eventType.slug,
+        timezone: guestTimezone,
+        from,
+        to,
+      });
+      const res = await fetch(
+        `/api/availability/${user.username}?${params.toString()}`,
+      );
+      if (!res.ok) throw new Error("Failed to load availability");
+      const data: AvailabilityResponse = await res.json();
+      return guestDaysFromAvailability(data.slots, guestTimezone);
+    },
+    [eventType.slug, guestTimezone, user.username],
+  );
+
   // ── Fetch entire month's availability ────────────────────
   const fetchMonthAvailability = useCallback(
     async (year: number, month: number) => {
       setMonthLoading(true);
       try {
-        const firstDay = formatDateKey(year, month, 1);
-        const lastDay = formatDateKey(year, month, getDaysInMonth(year, month));
-
-        const params = new URLSearchParams({
-          eventSlug: eventType.slug,
-          timezone: guestTimezone,
-          from: addDaysToDateKey(firstDay, -1),
-          to: addDaysToDateKey(lastDay, 1),
-        });
-
-        const res = await fetch(
-          `/api/availability/${user.username}?${params.toString()}`,
-        );
-
-        if (!res.ok) throw new Error("Failed to load availability");
-
-        const data: AvailabilityResponse = await res.json();
-        const grouped = groupSlotsByGuestDate(data.slots, guestTimezone);
-
-        const datesWithSlots = new Set<string>();
-        const slotsMap: Record<string, TimeSlot[]> = {};
-
-        for (const day of grouped) {
-          if (day.slots.length === 0) continue;
-          datesWithSlots.add(day.date);
-          slotsMap[day.date] = day.slots.map((s) => ({
-            time: formatDisplayTime(s.start, guestTimezone),
-            dateTime: s.start,
-          }));
-        }
-
+        const { dates, slotsByDate } = await loadMonthDays(year, month);
+        const datesWithSlots = new Set(dates);
         setAvailableDates(datesWithSlots);
-        setMonthSlots(slotsMap);
+        setMonthSlots(slotsByDate);
+        setHintDates(datesWithSlots);
+        setHintSlots(slotsByDate);
       } catch {
-        // On error, fail open — don't disable any dates
+        // On error, fail open - don't disable any dates
         setAvailableDates(new Set());
         setMonthSlots({});
+        setHintDates(new Set());
+        setHintSlots({});
       } finally {
         setMonthLoading(false);
       }
     },
-    [eventType.slug, guestTimezone, user.username],
+    [loadMonthDays],
   );
 
   // Fetch availability when month changes
   useEffect(() => {
     fetchMonthAvailability(viewYear, viewMonth);
   }, [viewYear, viewMonth, fetchMonthAvailability]);
+
+  const todayKey = formatDateKey(
+    todayParts.year,
+    todayParts.month,
+    todayParts.day,
+  );
+
+  // If this month has no remaining slots, fetch up to 2 later months for the hint.
+  useEffect(() => {
+    if (monthLoading) return;
+    if (viewYear !== todayParts.year || viewMonth !== todayParts.month) return;
+    if (
+      availableDates.has(todayKey) ||
+      nextAvailableDateKey(todayKey, availableDates)
+    ) {
+      setHintFetching(false);
+      return;
+    }
+
+    let cancelled = false;
+    setHintFetching(true);
+    void (async () => {
+      const dates = new Set(availableDates);
+      let slots = { ...monthSlots };
+      for (let ahead = 0; ahead < NEXT_AVAILABLE_LOOKAHEAD_MONTHS; ahead++) {
+        const next = nextLookaheadMonth({
+          todayKey,
+          availableDates: dates,
+          originYear: todayParts.year,
+          originMonth: todayParts.month,
+          monthsAheadFetched: ahead,
+        });
+        if (!next) break;
+        try {
+          const result = await loadMonthDays(next.year, next.month);
+          if (cancelled) return;
+          for (const date of result.dates) dates.add(date);
+          slots = { ...slots, ...result.slotsByDate };
+        } catch {
+          if (cancelled) return;
+        }
+      }
+      if (cancelled) return;
+      setHintDates(dates);
+      setHintSlots(slots);
+      setHintFetching(false);
+    })();
+
+    return () => {
+      cancelled = true;
+      setHintFetching(false);
+    };
+  }, [
+    monthLoading,
+    viewYear,
+    viewMonth,
+    todayParts.year,
+    todayParts.month,
+    todayKey,
+    availableDates,
+    monthSlots,
+    loadMonthDays,
+  ]);
 
   // ── Fetch slots for a single date (fallback) ─────────────
   const fetchSlots = useCallback(
@@ -326,7 +396,7 @@ export function BookingWidget({
     setSelectedDate(dateKey);
 
     // Use cached month slots if available, otherwise fetch
-    const cached = monthSlots[dateKey];
+    const cached = monthSlots[dateKey] ?? hintSlots[dateKey];
     if (cached && cached.length > 0) {
       setSlots(cached);
       setSlotsLoading(false);
@@ -436,11 +506,14 @@ export function BookingWidget({
   const daysInMonth = getDaysInMonth(viewYear, viewMonth);
   const firstDay = getFirstDayOfMonth(viewYear, viewMonth);
 
-  const todayKey = formatDateKey(
-    todayParts.year,
-    todayParts.month,
-    todayParts.day,
-  );
+  const todayEmpty = todayEmptyHint({
+    todayKey,
+    availableDates: hintDates,
+    monthLoading,
+    viewingTodayMonth:
+      viewYear === todayParts.year && viewMonth === todayParts.month,
+    slotsByDate: hintSlots,
+  });
 
   const calendarCells: (number | null)[] = [];
   for (let i = 0; i < firstDay; i++) {
@@ -586,13 +659,17 @@ export function BookingWidget({
                     !monthLoading && !isPast && !availableDates.has(dateKey);
                   const isDisabled = isPast || isUnavailable;
                   const isSelected = dateKey === selectedDate;
+                  const todayLabel =
+                    isToday && isUnavailable
+                      ? `${formatDisplayDate(dateKey, guestTimezone)} - ${NO_TIMES_LEFT_TODAY}`
+                      : formatDisplayDate(dateKey, guestTimezone);
 
                   return (
                     <button
                       key={dateKey}
                       type="button"
                       disabled={isDisabled}
-                      aria-label={formatDisplayDate(dateKey, guestTimezone)}
+                      aria-label={todayLabel}
                       onClick={() => handleDateClick(dateKey)}
                       className={cn(
                         "mx-auto flex size-10 items-center justify-center rounded-full text-sm transition-colors",
@@ -614,6 +691,45 @@ export function BookingWidget({
                   );
                 })}
               </div>
+
+              {todayEmpty ? (
+                <div
+                  role="status"
+                  className="mt-4 rounded-md border bg-muted/50 p-3 text-center text-sm"
+                >
+                  <p className="font-medium">{NO_TIMES_LEFT_TODAY}</p>
+                  {todayEmpty.nextDateKey ? (
+                    <p className="mt-1 text-muted-foreground">
+                      Next available:{" "}
+                      <button
+                        type="button"
+                        className="font-medium text-foreground underline underline-offset-4"
+                        onClick={() =>
+                          handleDateClick(todayEmpty.nextDateKey!)
+                        }
+                      >
+                        {todayEmpty.nextSlotStart
+                          ? formatSlotDateInTimeZone(
+                              todayEmpty.nextSlotStart,
+                              guestTimezone,
+                            )
+                          : formatDisplayDate(
+                              todayEmpty.nextDateKey,
+                              guestTimezone,
+                            )}
+                      </button>
+                    </p>
+                  ) : hintFetching ? (
+                    <p className="mt-1 text-muted-foreground">
+                      Looking for the next opening…
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-muted-foreground">
+                      Try another day.
+                    </p>
+                  )}
+                </div>
+              ) : null}
             </div>
           )}
 

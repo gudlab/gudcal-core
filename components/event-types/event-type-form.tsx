@@ -11,6 +11,7 @@ import { createEventType, updateEventType } from "@/actions/event-types";
 import {
   eventTypeSchema,
   defaultEventTypeValues,
+  MINIMUM_NOTICE_HELPER_TEXT,
   type EventTypeFormData,
 } from "@/lib/validations/event-type";
 import { Button } from "@/components/ui/button";
@@ -61,6 +62,18 @@ const BUFFER_OPTIONS = [
   { value: 60, label: "1 hour" },
 ];
 
+const NOTICE_OPTIONS = [
+  { value: 0, label: "None" },
+  { value: 15, label: "15 min" },
+  { value: 30, label: "30 min" },
+  { value: 60, label: "1 hour" },
+  { value: 120, label: "2 hours" },
+  { value: 240, label: "4 hours" },
+  { value: 480, label: "8 hours" },
+  { value: 1440, label: "1 day" },
+  { value: 2880, label: "2 days" },
+];
+
 interface EventTypeFormProps {
   eventType?: EventType;
 }
@@ -107,6 +120,14 @@ export function EventTypeForm({ eventType }: EventTypeFormProps) {
       form.setValue("slug", slug);
     }
   }, [title, isEditing, form]);
+
+  const currentNotice = form.watch("minimumNotice");
+  const noticeOptions = NOTICE_OPTIONS.some((opt) => opt.value === currentNotice)
+    ? NOTICE_OPTIONS
+    : [
+        ...NOTICE_OPTIONS,
+        { value: currentNotice, label: `${currentNotice} min` },
+      ].sort((a, b) => a.value - b.value);
 
   const onSubmit = (data: EventTypeFormData) => {
     startTransition(async () => {
@@ -256,6 +277,33 @@ export function EventTypeForm({ eventType }: EventTypeFormProps) {
             <CardTitle>Advanced Settings</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="minimumNotice">Minimum notice</Label>
+              <Select
+                value={currentNotice.toString()}
+                onValueChange={(v) =>
+                  form.setValue("minimumNotice", parseInt(v))
+                }
+              >
+                <SelectTrigger id="minimumNotice">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {noticeOptions.map((opt) => (
+                    <SelectItem
+                      key={opt.value}
+                      value={opt.value.toString()}
+                    >
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {MINIMUM_NOTICE_HELPER_TEXT}
+              </p>
+            </div>
+
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>Buffer before</Label>

@@ -40,6 +40,12 @@ export const eventTypeSchema = z.object({
 
 export type EventTypeFormData = z.infer<typeof eventTypeSchema>;
 
+/** Default minimum notice for NEW event types (minutes). Existing rows are unchanged. */
+export const DEFAULT_MINIMUM_NOTICE_MINUTES = 60;
+
+export const MINIMUM_NOTICE_HELPER_TEXT =
+  "Guests must book at least this far in advance. Times that start sooner than this will not be offered.";
+
 /** Default values for a new event type */
 export const defaultEventTypeValues: EventTypeFormData = {
   title: "",
@@ -52,7 +58,7 @@ export const defaultEventTypeValues: EventTypeFormData = {
   bufferBefore: 0,
   bufferAfter: 0,
   maxBookingsPerDay: null,
-  minimumNotice: 120,
+  minimumNotice: DEFAULT_MINIMUM_NOTICE_MINUTES,
   requiresConfirmation: false,
   isActive: true,
   visibility: EventVisibility.PUBLIC,
