@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Icons } from "@/components/shared/icons";
 import { AvailabilityCard } from "@/components/availability/availability-card";
+import { TimeOffList } from "@/components/availability/time-off-list";
 
 export const metadata = {
   title: "Availability - GudCal",
@@ -59,14 +60,24 @@ export default async function AvailabilityPage() {
   const user = await getCurrentUser();
   if (!user?.id) redirect("/login");
 
-  const availabilities = await prisma.availability.findMany({
-    where: { userId: user.id },
-    orderBy: [{ isDefault: "desc" }, { createdAt: "desc" }],
-    include: {
-      rules: true,
-      _count: { select: { eventTypes: true } },
-    },
-  });
+  const [availabilities, timeOffs, userRow] = await Promise.all([
+    prisma.availability.findMany({
+      where: { userId: user.id },
+      orderBy: [{ isDefault: "desc" }, { createdAt: "desc" }],
+      include: {
+        rules: true,
+        _count: { select: { eventTypes: true } },
+      },
+    }),
+    prisma.timeOff.findMany({
+      where: { userId: user.id },
+      orderBy: { startAt: "asc" },
+    }),
+    prisma.user.findUnique({
+      where: { id: user.id },
+      select: { timezone: true },
+    }),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -112,6 +123,18 @@ export default async function AvailabilityPage() {
           ))}
         </div>
       )}
+
+      <TimeOffList
+        timeOffs={timeOffs.map((block) => ({
+          id: block.id,
+          startAt: block.startAt.toISOString(),
+          endAt: block.endAt.toISOString(),
+          allDay: block.allDay,
+          reason: block.reason,
+          label: block.label,
+        }))}
+        timezone={userRow?.timezone ?? "America/New_York"}
+      />
     </div>
   );
 }

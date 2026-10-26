@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { CalendarLimitError } from "@/lib/calendar/connections";
 import { handleGoogleCallback } from "@/lib/calendar/google";
 import {
   OAUTH_STATE_COOKIE,
@@ -69,6 +70,9 @@ export async function GET(request: Request) {
     await handleGoogleCallback(code, consumed.userId);
     return redirectToIntegrations(request, { success: "google_connected" });
   } catch (err) {
+    if (err instanceof CalendarLimitError) {
+      return redirectToIntegrations(request, { error: "calendar_limit" });
+    }
     console.error("Google Calendar callback error:", err);
     return redirectToIntegrations(request, { error: "callback_failed" });
   }

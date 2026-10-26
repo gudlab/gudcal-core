@@ -302,6 +302,19 @@ export function createMcpServer() {
 
       const endTime = addMinutes(startTime, eventType.duration);
 
+      const { getTimeOffBusyTimes } = await import("@/lib/calendar/busy");
+      const { slotOverlapsBusyTimes, TIME_OFF_OVERLAP_ERROR } = await import(
+        "@/lib/time-off"
+      );
+      const timeOffBusyTimes = await getTimeOffBusyTimes(
+        user.id,
+        startTime,
+        endTime,
+      );
+      if (slotOverlapsBusyTimes(startTime, endTime, timeOffBusyTimes)) {
+        return errorResponse(TIME_OFF_OVERLAP_ERROR, true);
+      }
+
       const calendarBusy = await mcpRefuseWriteIfCalendarBusy({
         userId: user.id,
         start: startTime,

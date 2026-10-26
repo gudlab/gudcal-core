@@ -10,7 +10,11 @@ import {
   createCalendarEventForBooking,
   deleteCalendarEventForBooking,
 } from "@/lib/calendar/google";
-import { checkWriteAgainstCalendarBusy } from "@/lib/calendar/busy";
+import {
+  checkWriteAgainstCalendarBusy,
+  getTimeOffBusyTimes,
+} from "@/lib/calendar/busy";
+import { slotOverlapsBusyTimes, TIME_OFF_OVERLAP_ERROR } from "@/lib/time-off";
 
 const rescheduleSchema = z.object({
   originalBookingUid: z.string().min(1),
@@ -87,6 +91,18 @@ export async function POST(request: Request) {
     }
 
     const newEndTime = addMinutes(newStartTime, eventType.duration);
+
+    const timeOffBusyTimes = await getTimeOffBusyTimes(
+      originalBooking.userId,
+      newStartTime,
+      newEndTime,
+    );
+    if (slotOverlapsBusyTimes(newStartTime, newEndTime, timeOffBusyTimes)) {
+      return NextResponse.json(
+        { error: TIME_OFF_OVERLAP_ERROR },
+        { status: 409 },
+      );
+    }
 
     const calendarBusy = await checkWriteAgainstCalendarBusy({
       userId: originalBooking.userId,

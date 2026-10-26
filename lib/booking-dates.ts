@@ -6,7 +6,28 @@
  * Date in a west-of-UTC timezone rolls the label back one day (GudCal #15).
  */
 
+import { fromZonedTime } from "date-fns-tz";
+
 const DATE_KEY = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * UTC instant of civil midnight (`00:00:00.000`) of `dateKey` in `timeZone`.
+ * Do not wrap the result in date-fns `startOfDay` — that re-cuts in the
+ * process timezone and shifts west-of-UTC ranges.
+ */
+export function zonedStartOfDay(dateKey: string, timeZone: string): Date {
+  const { year, monthIndex, day } = parseDateKey(dateKey);
+  return fromZonedTime(new Date(year, monthIndex, day, 0, 0, 0, 0), timeZone);
+}
+
+/** UTC instant of civil end-of-day (`23:59:59.999`) of `dateKey` in `timeZone`. */
+export function zonedEndOfDay(dateKey: string, timeZone: string): Date {
+  const { year, monthIndex, day } = parseDateKey(dateKey);
+  return fromZonedTime(
+    new Date(year, monthIndex, day, 23, 59, 59, 999),
+    timeZone,
+  );
+}
 
 export function formatDateKey(
   year: number,

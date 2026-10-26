@@ -5,13 +5,14 @@ import { prisma } from "@/lib/db";
 import { Button } from "@/components/ui/button";
 import {
   Card,
+  CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Icons } from "@/components/shared/icons";
-import { DisconnectCalendarButton } from "@/components/integrations/disconnect-calendar-button";
+import { CalendarAccountRow } from "@/components/integrations/calendar-account-row";
 
 export const metadata = {
   title: "Integrations – GudCal",
@@ -64,6 +65,12 @@ const CONNECT_MESSAGES: Record<
       "This server is missing AUTH_SECRET (or NEXTAUTH_SECRET), which is required to connect calendars.",
     variant: "destructive",
   },
+  calendar_limit: {
+    title: "Could not add this calendar",
+    description:
+      "This instance reached its calendar connection limit. Disconnect an unused account and try again.",
+    variant: "destructive",
+  },
 };
 
 function firstQueryValue(
@@ -91,8 +98,17 @@ export default async function IntegrationsPage({
       ? CONNECT_MESSAGES[error]
       : undefined;
 
-  const googleConnection = await prisma.calendarConnection.findUnique({
-    where: { userId_provider: { userId, provider: "GOOGLE" } },
+  const googleConnections = await prisma.calendarConnection.findMany({
+    where: { userId, provider: "GOOGLE" },
+    orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
+    select: {
+      id: true,
+      provider: true,
+      email: true,
+      calendarId: true,
+      isPrimary: true,
+      includeInBusyCheck: true,
+    },
   });
 
   return (
@@ -123,21 +139,28 @@ export default async function IntegrationsPage({
                 <div>
                   <CardTitle className="text-base">Google Calendar</CardTitle>
                   <CardDescription>
-                    {googleConnection
-                      ? `Connected as ${googleConnection.email ?? "unknown"}`
+                    {googleConnections.length > 0
+                      ? `${googleConnections.length} account${googleConnections.length === 1 ? "" : "s"} connected`
                       : "Check for conflicts and create events automatically"}
                   </CardDescription>
                 </div>
               </div>
-              {googleConnection ? (
-                <DisconnectCalendarButton provider="GOOGLE" />
-              ) : (
-                <Button asChild>
-                  <a href="/api/calendar/google/connect">Connect</a>
-                </Button>
-              )}
+              <Button asChild>
+                <a href="/api/calendar/google/connect">
+                  {googleConnections.length > 0
+                    ? "Add another Google account"
+                    : "Connect"}
+                </a>
+              </Button>
             </div>
           </CardHeader>
+          {googleConnections.length > 0 ? (
+            <CardContent className="space-y-3">
+              {googleConnections.map((account) => (
+                <CalendarAccountRow key={account.id} account={account} />
+              ))}
+            </CardContent>
+          ) : null}
         </Card>
 
         {/* Zoom - Coming Soon */}
