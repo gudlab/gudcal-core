@@ -6,6 +6,7 @@ import {
   consumeOauthState,
   createOauthState,
   hasOauthStateSecret,
+  oauthNonceCookieOptions,
   verifyOauthState,
 } from "./oauth-state";
 
@@ -128,6 +129,53 @@ describe("Google calendar OAuth state", () => {
       now,
     });
     assert.deepEqual(replayWrongNonce, { ok: false, error: "invalid_state" });
+  });
+
+  it("sets the nonce cookie Secure flag from the public HTTPS URL, not NODE_ENV", () => {
+    const previousAppUrl = process.env.NEXT_PUBLIC_APP_URL;
+    const previousFallbackUrl = process.env.APP_URL;
+    const previousNodeEnv = process.env.NODE_ENV;
+
+    const restore = () => {
+      if (previousAppUrl === undefined) {
+        delete process.env.NEXT_PUBLIC_APP_URL;
+      } else {
+        process.env.NEXT_PUBLIC_APP_URL = previousAppUrl;
+      }
+      if (previousFallbackUrl === undefined) {
+        delete process.env.APP_URL;
+      } else {
+        process.env.APP_URL = previousFallbackUrl;
+      }
+      if (previousNodeEnv === undefined) {
+        delete process.env.NODE_ENV;
+      } else {
+        process.env.NODE_ENV = previousNodeEnv;
+      }
+    };
+
+    try {
+      process.env.NODE_ENV = "production";
+      process.env.NEXT_PUBLIC_APP_URL = "http://192.168.1.10:3000";
+      delete process.env.APP_URL;
+      assert.equal(oauthNonceCookieOptions(600).secure, false);
+
+      process.env.NEXT_PUBLIC_APP_URL = "https://cal.example.com";
+      process.env.NODE_ENV = "development";
+      assert.equal(oauthNonceCookieOptions(600).secure, true);
+
+      delete process.env.NEXT_PUBLIC_APP_URL;
+      process.env.APP_URL = "https://cal.example.com";
+      process.env.NODE_ENV = "production";
+      assert.equal(oauthNonceCookieOptions(600).secure, true);
+
+      delete process.env.NEXT_PUBLIC_APP_URL;
+      delete process.env.APP_URL;
+      process.env.NODE_ENV = "production";
+      assert.equal(oauthNonceCookieOptions(600).secure, false);
+    } finally {
+      restore();
+    }
   });
 
   it("reports a missing signing secret", () => {
