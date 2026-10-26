@@ -57,10 +57,10 @@ if [ -z "$RESEND_API_KEY" ]; then
   warn "RESEND_KEY    → demo value (emails will NOT send)"
 fi
 
-# ─── Optional: Encryption Key ────────────────────────────────
+# ─── Encryption key for calendar tokens ──────────────────────
+# Must be persistent. A random key per start makes stored tokens unreadable.
 if [ -z "$ENCRYPTION_KEY" ]; then
-  export ENCRYPTION_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
-  warn "ENCRYPT_KEY   → auto-generated (random)"
+  warn "ENCRYPT_KEY   → unset (set a persistent ENCRYPTION_KEY before connecting Google Calendar)"
 fi
 
 # ─── Optional: Cron Secret ───────────────────────────────────

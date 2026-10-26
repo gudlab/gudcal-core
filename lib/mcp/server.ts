@@ -3,6 +3,10 @@ import { z } from "zod";
 
 import { prisma } from "@/lib/db";
 import { getAvailableSlots } from "@/lib/availability";
+import {
+  mcpLoadAvailabilityBusyTimes,
+  mcpRefuseWriteIfCalendarBusy,
+} from "@/lib/mcp/calendar-busy";
 import { addDays, addMinutes, startOfDay, endOfDay } from "date-fns";
 import { fromZonedTime } from "date-fns-tz";
 import { randomBytes } from "crypto";
@@ -26,8 +30,11 @@ async function authenticateKey(apiKey: string) {
   return { error: null, user: key.user, keyId: key.id };
 }
 
-function errorResponse(text: string) {
-  return { content: [{ type: "text" as const, text }] };
+function errorResponse(text: string, isError = false) {
+  return {
+    content: [{ type: "text" as const, text }],
+    ...(isError ? { isError: true as const } : {}),
+  };
 }
 
 function jsonResponse(data: unknown) {
@@ -170,6 +177,12 @@ export function createMcpServer() {
         select: { startTime: true, endTime: true },
       });
 
+      const busyTimes = await mcpLoadAvailabilityBusyTimes(
+        user.id,
+        startDate,
+        endDate,
+      );
+
       const slots = getAvailableSlots({
         startDate,
         endDate,
@@ -191,7 +204,7 @@ export function createMcpServer() {
           isBlocked: o.isBlocked,
         })),
         hostTimezone: availability.timezone,
-        busyTimes: [],
+        busyTimes,
         existingBookings: existingBookings.map((b) => ({
           start: b.startTime,
           end: b.endTime,
@@ -289,17 +302,37 @@ export function createMcpServer() {
 
       const endTime = addMinutes(startTime, eventType.duration);
 
+      const calendarBusy = await mcpRefuseWriteIfCalendarBusy({
+        userId: user.id,
+        start: startTime,
+        end: endTime,
+        bufferBefore: eventType.bufferBefore,
+        bufferAfter: eventType.bufferAfter,
+      });
+      if (calendarBusy) {
+        return calendarBusy;
+      }
+
       const booking = await prisma.$transaction(async (tx) => {
         const conflicts = await tx.booking.findMany({
           where: {
             userId: user.id,
-            startTime: { lt: endTime },
-            endTime: { gt: startTime },
+            startTime: { lte: endTime },
+            endTime: { gte: startTime },
             status: { in: ["CONFIRMED", "PENDING"] },
           },
         });
 
-        if (conflicts.length > 0) {
+        const hasConflict = conflicts.some((b) => {
+          const bufferedStart = addMinutes(
+            b.startTime,
+            -eventType.bufferBefore,
+          );
+          const bufferedEnd = addMinutes(b.endTime, eventType.bufferAfter);
+          return startTime < bufferedEnd && endTime > bufferedStart;
+        });
+
+        if (hasConflict) {
           return null;
         }
 
@@ -321,6 +354,7 @@ export function createMcpServer() {
       if (!booking) {
         return errorResponse(
           "This time slot is no longer available. Please check availability and try another time.",
+          true,
         );
       }
 

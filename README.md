@@ -45,7 +45,7 @@ If this is useful, **[star this repo](https://github.com/gudlab/gudcal-core)** �
 
 - **Agent-first** — 21 MCP tools plus a REST API so an AI agent can run scheduling after you create one API key
 - **Calendly-simple** — event types, availability, buffers, timezone-aware public booking pages
-- **Calendar sync** — Google Calendar conflict detection and event creation
+- **Calendar sync** - Google Calendar free/busy on availability, booking create, and reschedule, plus event creation
 - **Teams** — organizations with round-robin and collective scheduling (Team plan on cloud)
 - **Self-host or cloud** — Docker / Vercel, or use [gudcal.com](https://gudcal.com)
 
@@ -73,6 +73,12 @@ pnpm prisma db push
 pnpm dev
 ```
 
+Calendar token encryption uses `ENCRYPTION_KEY` (64 hex characters: `openssl rand -hex 32`). Set it before connecting Google Calendar and keep the same value across restarts. If it is unset, token encrypt/decrypt fails with a clear error instead of minting a random key.
+
+Upgrade note: older GudCal builds (and the Docker entrypoint) minted a random `ENCRYPTION_KEY` when it was unset. After this change that fallback is gone. If you already connected Google Calendar under a generated or missing key, set a persistent `ENCRYPTION_KEY` in `.env` / `.env.local` and reconnect Google Calendar. Stored tokens from the old key cannot be decrypted.
+
+When Google Calendar is connected, public availability and MCP `get_availability` exclude those busy times. A failed busy lookup is logged and treated as no extra busy on reads. Booking create, reschedule, and MCP `create_booking` reject overlapping busy time with HTTP 409, or HTTP 503 if the lookup fails. With no calendar connected, only GudCal bookings count as busy.
+
 See [Self-Hosting](https://gudcal.com/docs/self-hosting) for Docker and production.
 
 ## Docker
@@ -83,7 +89,7 @@ See [Self-Hosting](https://gudcal.com/docs/self-hosting) for Docker and producti
 git clone https://github.com/gudlab/gudcal-core.git
 cd gudcal-core
 cp .env.example .env
-# set AUTH_SECRET and other required secrets in .env
+# set AUTH_SECRET, ENCRYPTION_KEY, and other required secrets in .env
 docker compose up -d
 ```
 
@@ -96,9 +102,12 @@ docker build -t gudcal .
 docker run -p 3000:3000 \
   -e DATABASE_URL="postgres://..." \
   -e AUTH_SECRET="..." \
+  -e ENCRYPTION_KEY="$(openssl rand -hex 32)" \
   -e NEXT_PUBLIC_APP_URL="http://localhost:3000" \
   gudcal
 ```
+
+Reuse the same `ENCRYPTION_KEY` on later `docker run` invocations. Generating a new value on each start makes stored calendar tokens unreadable.
 
 ## MCP
 

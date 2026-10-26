@@ -1,6 +1,10 @@
 import { google } from "googleapis";
-import { randomBytes, createCipheriv, createDecipheriv } from "crypto";
 import { prisma } from "@/lib/db";
+import { decrypt, encrypt } from "./encryption";
+import { CalendarBusyLookupError, queryGoogleBusyTimes } from "./busy";
+
+export { decrypt, encrypt } from "./encryption";
+export { CalendarBusyLookupError } from "./busy";
 
 const SCOPES = [
   "https://www.googleapis.com/auth/calendar.readonly",
@@ -13,32 +17,6 @@ function getOAuth2Client() {
     process.env.GOOGLE_CALENDAR_CLIENT_SECRET,
     `${process.env.NEXT_PUBLIC_APP_URL}/api/calendar/google/callback`
   );
-}
-
-// AES-256-GCM encryption
-const ALGORITHM = "aes-256-gcm";
-const KEY = process.env.ENCRYPTION_KEY
-  ? Buffer.from(process.env.ENCRYPTION_KEY, "hex")
-  : randomBytes(32);
-
-export function encrypt(text: string): string {
-  const iv = randomBytes(16);
-  const cipher = createCipheriv(ALGORITHM, KEY, iv);
-  let encrypted = cipher.update(text, "utf8", "hex");
-  encrypted += cipher.final("hex");
-  const authTag = cipher.getAuthTag().toString("hex");
-  return `${iv.toString("hex")}:${authTag}:${encrypted}`;
-}
-
-export function decrypt(encryptedText: string): string {
-  const [ivHex, authTagHex, encrypted] = encryptedText.split(":");
-  const iv = Buffer.from(ivHex, "hex");
-  const authTag = Buffer.from(authTagHex, "hex");
-  const decipher = createDecipheriv(ALGORITHM, KEY, iv);
-  decipher.setAuthTag(authTag);
-  let decrypted = decipher.update(encrypted, "hex", "utf8");
-  decrypted += decipher.final("utf8");
-  return decrypted;
 }
 
 export function getGoogleAuthUrl(state: string): string {
@@ -151,35 +129,37 @@ export async function getBusyTimes(
   startDate: Date,
   endDate: Date
 ): Promise<{ start: Date; end: Date }[]> {
-  try {
+  const connection = await prisma.calendarConnection.findUnique({
+    where: { userId_provider: { userId, provider: "GOOGLE" } },
+  });
+
+  return queryGoogleBusyTimes(connection, async () => {
+    const calendarId = connection?.calendarId;
+    if (!calendarId) {
+      throw new CalendarBusyLookupError(
+        "Google Calendar is connected but has no calendar ID",
+      );
+    }
+
     const calendar = await getGoogleCalendarClient(userId);
-    const connection = await prisma.calendarConnection.findUnique({
-      where: { userId_provider: { userId, provider: "GOOGLE" } },
-    });
-
-    if (!connection?.calendarId) return [];
-
     const response = await calendar.freebusy.query({
       requestBody: {
         timeMin: startDate.toISOString(),
         timeMax: endDate.toISOString(),
-        items: [{ id: connection.calendarId }],
+        items: [{ id: calendarId }],
       },
     });
 
-    const busy =
-      response.data.calendars?.[connection.calendarId]?.busy ?? [];
+    // googleapis types `calendars` as `{ [id]: ... } | null | undefined`.
+    const calendars = response.data.calendars;
+    if (calendars == null) {
+      throw new CalendarBusyLookupError(
+        "Google free/busy response did not include calendars",
+      );
+    }
 
-    return busy
-      .filter((b) => b.start && b.end)
-      .map((b) => ({
-        start: new Date(b.start!),
-        end: new Date(b.end!),
-      }));
-  } catch (error) {
-    console.error("Error fetching busy times:", error);
-    return [];
-  }
+    return { data: { calendars } };
+  });
 }
 
 interface CalendarEventInput {

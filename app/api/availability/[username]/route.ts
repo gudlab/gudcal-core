@@ -4,7 +4,7 @@ import { fromZonedTime } from "date-fns-tz";
 
 import { prisma } from "@/lib/db";
 import { getAvailableSlots } from "@/lib/availability";
-import { getBusyTimes } from "@/lib/calendar/google";
+import { getBusyTimesForRead } from "@/lib/calendar/busy";
 
 export async function GET(
   request: Request,
@@ -106,8 +106,8 @@ export async function GET(
       select: { startTime: true, endTime: true },
     });
 
-    // Fetch busy times from Google Calendar (returns [] if no connection)
-    const busyTimes = await getBusyTimes(user.id, startDate, endDate);
+    // External busy times (empty if no calendar is connected; fail-open on lookup error)
+    const busyTimes = await getBusyTimesForRead(user.id, startDate, endDate);
 
     // Generate available slots (returns { date, slots: { start, end }[] }[])
     const daySlots = getAvailableSlots({

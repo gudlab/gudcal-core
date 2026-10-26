@@ -6,14 +6,52 @@ on:
   pull_request:
     branches: [main]
 
+env:
+  # prisma generate (postinstall) and Next.js import-time clients
+  DATABASE_URL: postgres://build:build@localhost:5432/build
+  SKIP_ENV_VALIDATION: "1"
+  NEXT_TELEMETRY_DISABLED: "1"
+  NEXT_PUBLIC_IS_SELF_HOSTED: "true"
+  NEXT_PUBLIC_APP_URL: http://localhost:3000
+  AUTH_SECRET: build-placeholder-secret-not-used-at-runtime
+  GOOGLE_CLIENT_ID: 000000000000-build.apps.googleusercontent.com
+  GOOGLE_CLIENT_SECRET: GOCSPX-build-placeholder
+  RESEND_API_KEY: re_build_placeholder_000000000000000
+
 jobs:
-  unit-tests:
-    name: Unit tests
+  test:
+    name: Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      # Prisma 7 requires Node 20.19+, 22.12+, or 24.0+. .nvmrc is 20.19.0.
       - uses: actions/setup-node@v4
         with:
           node-version-file: ".nvmrc"
-      - name: Run unit tests
-        run: npx --yes tsx --test lib/booking-dates.test.ts lib/calendar/oauth-state.test.ts
+          cache: pnpm
+      - name: Install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+      - name: Unit tests
+        run: pnpm test
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: pnpm
+      - name: Install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+      - name: Production build
+        run: pnpm build
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
