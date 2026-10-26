@@ -220,6 +220,7 @@ export async function POST(request: Request) {
         additionalGuests: booking.additionalGuests,
         eventType: { title: eventType.title, locationValue: eventType.locationValue },
         host: { name: eventType.user.name, email: eventType.user.email },
+        calendarInviteSent: booking.status !== "CONFIRMED",
       });
       sendBookingConfirmation(emailData).catch(() => {});
     }

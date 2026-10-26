@@ -1,4 +1,4 @@
-import { google } from "googleapis";
+import { google, type calendar_v3 } from "googleapis";
 import type { CalendarConnection } from "@/app/generated/prisma/client";
 import { prisma } from "@/lib/db";
 import { decrypt, encrypt } from "./encryption";
@@ -185,7 +185,9 @@ interface CalendarEventInput {
   startTime: Date;
   endTime: Date;
   attendeeEmail: string;
-  additionalAttendees?: { email: string }[];
+  attendeeName?: string;
+  additionalAttendees?: { email: string; name?: string }[];
+  organizerName?: string;
   location?: string;
   createMeetLink?: boolean;
 }
@@ -205,9 +207,18 @@ export async function createCalendarEvent(
     const calendar = await getGoogleCalendarClientForConnection(connection);
     const calendarId = connection.calendarId ?? "primary";
 
-    const eventData: any = {
+    const guestLines = [
+      event.attendeeName
+        ? `Guest: ${event.attendeeName} (${event.attendeeEmail})`
+        : `Guest: ${event.attendeeEmail}`,
+      ...(event.additionalAttendees ?? []).map((a) =>
+        a.name ? `Guest: ${a.name} (${a.email})` : `Guest: ${a.email}`,
+      ),
+    ].join("\n");
+
+    const eventData: calendar_v3.Schema$Event = {
       summary: event.summary,
-      description: event.description,
+      description: [event.description, guestLines].filter(Boolean).join("\n\n"),
       start: {
         dateTime: event.startTime.toISOString(),
         timeZone: "UTC",
@@ -216,11 +227,13 @@ export async function createCalendarEvent(
         dateTime: event.endTime.toISOString(),
         timeZone: "UTC",
       },
-      attendees: [
-        { email: event.attendeeEmail },
-        ...(event.additionalAttendees ?? []),
-      ],
     };
+
+    // Name the organizer on the host's calendar. Do not set organizer.email —
+    // Google rejects a mailbox that is not the connected calendar account.
+    if (event.organizerName) {
+      eventData.organizer = { displayName: event.organizerName };
+    }
 
     if (event.location) {
       eventData.location = event.location;
@@ -235,11 +248,15 @@ export async function createCalendarEvent(
       };
     }
 
+    // Omit attendees. Google Calendar still syncs invitations to Gmail guests
+    // even with sendUpdates: "none", and Gmail labels those
+    // "Invitation from an unknown sender" when the host is not a contact.
+    // Guests are invited with a named GudCal ICS instead.
     const response = await calendar.events.insert({
       calendarId,
       requestBody: eventData,
       conferenceDataVersion: event.createMeetLink ? 1 : 0,
-      sendUpdates: "all",
+      sendUpdates: "none",
     });
 
     if (!response.data.id) return null;
@@ -284,7 +301,7 @@ export async function updateCalendarEvent(
       calendarId,
       eventId,
       requestBody: updateData,
-      sendUpdates: "all",
+      sendUpdates: "none",
     });
 
     return true;
@@ -307,7 +324,7 @@ export async function deleteCalendarEvent(
     await calendar.events.delete({
       calendarId: connection.calendarId ?? "primary",
       eventId,
-      sendUpdates: "all",
+      sendUpdates: "none",
     });
     return true;
   });
@@ -327,21 +344,24 @@ export async function disconnectGoogleCalendar(userId: string): Promise<void> {
 }
 
 /**
- * Helper: parse additionalGuests JSON into { email } array for calendar attendees.
+ * Helper: parse additionalGuests JSON into { email, name } for description lines.
  */
 function parseAdditionalAttendees(
   additionalGuests: unknown,
-): { email: string }[] {
+): { email: string; name?: string }[] {
   if (!additionalGuests || !Array.isArray(additionalGuests)) return [];
   return additionalGuests
     .filter(
-      (g): g is { email: string } =>
+      (g): g is { email: string; name?: string } =>
         typeof g === "object" &&
         g !== null &&
         "email" in g &&
-        typeof (g as any).email === "string",
+        typeof (g as { email: unknown }).email === "string",
     )
-    .map((g) => ({ email: g.email }));
+    .map((g) => ({
+      email: g.email,
+      name: typeof g.name === "string" ? g.name : undefined,
+    }));
 }
 
 /**
@@ -371,13 +391,20 @@ export async function createCalendarEventForBooking(
   try {
     const isGoogleMeet = eventType.locationType === "GOOGLE_MEET";
 
+    const host = await prisma.user.findUnique({
+      where: { id: hostUserId },
+      select: { name: true },
+    });
+
     const result = await createCalendarEvent(hostUserId, {
       summary: `${eventType.title} with ${booking.guestName}`,
       description: booking.notes ?? undefined,
       startTime: booking.startTime,
       endTime: booking.endTime,
       attendeeEmail: booking.guestEmail,
+      attendeeName: booking.guestName,
       additionalAttendees: parseAdditionalAttendees(booking.additionalGuests),
+      organizerName: host?.name ?? undefined,
       location: booking.location ?? undefined,
       createMeetLink: isGoogleMeet,
     });

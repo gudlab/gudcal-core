@@ -222,6 +222,7 @@ export async function POST(request: Request) {
         additionalGuests: newBooking.additionalGuests,
         eventType: { title: eventType.title, locationValue: eventType.locationValue },
         host: { name: originalBooking.host.name, email: originalBooking.host.email },
+        calendarInviteSent: newBooking.status !== "CONFIRMED",
       });
 
       const oldGuestStart = toZonedTime(originalBooking.startTime, originalBooking.guestTimezone);
@@ -231,6 +232,13 @@ export async function POST(request: Request) {
         ...newEmailData,
         oldDateStr: format(oldGuestStart, "EEEE, MMMM d, yyyy"),
         oldTimeStr: `${format(oldGuestStart, "h:mm a")} - ${format(oldGuestEnd, "h:mm a")}`,
+        ...(originalBooking.status === "CONFIRMED" && {
+          previousInvite: {
+            uid: originalBooking.uid,
+            startTime: originalBooking.startTime,
+            endTime: originalBooking.endTime,
+          },
+        }),
       }).catch(() => {});
     }
 
