@@ -18,7 +18,9 @@ export const env = createEnv({
     GOOGLE_CALENDAR_CLIENT_ID: z.string().optional(),
     GOOGLE_CALENDAR_CLIENT_SECRET: z.string().optional(),
 
-    // Encryption key for storing OAuth tokens
+    // Persistent AES-256 key for stored calendar OAuth tokens (64 hex chars).
+    // Optional so the app can boot without calendar sync; encrypt/decrypt
+    // throws if this is unset or invalid (no random per-process fallback).
     ENCRYPTION_KEY: z.string().optional(),
 
     // Cron job authentication

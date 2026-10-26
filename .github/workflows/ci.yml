@@ -7,13 +7,15 @@ on:
     branches: [main]
 
 jobs:
-  date-helpers:
-    name: Date helpers
+  test:
+    name: Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version-file: ".nvmrc"
-      - name: Civil-date tests
-        run: npx --yes tsx --test lib/booking-dates.test.ts
+      - name: Install test dependencies
+        run: npm install --no-package-lock --ignore-scripts tsx date-fns
+      - name: Tests
+        run: npm test

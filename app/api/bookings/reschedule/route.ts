@@ -10,6 +10,7 @@ import {
   createCalendarEventForBooking,
   deleteCalendarEventForBooking,
 } from "@/lib/calendar/google";
+import { checkWriteAgainstCalendarBusy } from "@/lib/calendar/busy";
 
 const rescheduleSchema = z.object({
   originalBookingUid: z.string().min(1),
@@ -86,6 +87,24 @@ export async function POST(request: Request) {
     }
 
     const newEndTime = addMinutes(newStartTime, eventType.duration);
+
+    const calendarBusy = await checkWriteAgainstCalendarBusy({
+      userId: originalBooking.userId,
+      start: newStartTime,
+      end: newEndTime,
+      bufferBefore: eventType.bufferBefore,
+      bufferAfter: eventType.bufferAfter,
+      ignoreBusyOverlapping: {
+        start: originalBooking.startTime,
+        end: originalBooking.endTime,
+      },
+    });
+    if (!calendarBusy.ok) {
+      return NextResponse.json(
+        { error: calendarBusy.error },
+        { status: calendarBusy.status },
+      );
+    }
 
     // Use a transaction: mark old as RESCHEDULED + create new booking + conflict check
     const newBooking = await prisma.$transaction(async (tx) => {

@@ -5,6 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { buildBookingEmailData, sendBookingConfirmation } from "@/lib/emails";
 import { createCalendarEventForBooking } from "@/lib/calendar/google";
+import { checkWriteAgainstCalendarBusy } from "@/lib/calendar/busy";
 
 const additionalGuestSchema = z.object({
   name: z.string().min(1).max(200),
@@ -81,6 +82,20 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: "No availability configured" },
         { status: 400 },
+      );
+    }
+
+    const calendarBusy = await checkWriteAgainstCalendarBusy({
+      userId: eventType.userId,
+      start: startTime,
+      end: endTime,
+      bufferBefore: eventType.bufferBefore,
+      bufferAfter: eventType.bufferAfter,
+    });
+    if (!calendarBusy.ok) {
+      return NextResponse.json(
+        { error: calendarBusy.error },
+        { status: calendarBusy.status },
       );
     }
 
