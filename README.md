@@ -69,9 +69,11 @@ cd gudcal-core
 pnpm install
 cp .env.example .env.local
 pnpm prisma generate
-pnpm prisma db push
+pnpm prisma db push   # local-dev only
 pnpm dev
 ```
+
+`pnpm prisma db push` is a local-dev shortcut while iterating on `schema.prisma`. Docker and production self-host run `pnpm prisma migrate deploy` (the image entrypoint does this at start). Existing databases that were created with `db push` need a one-time baseline first. See [UPGRADE.md](UPGRADE.md).
 
 Calendar token encryption uses `ENCRYPTION_KEY` (64 hex characters: `openssl rand -hex 32`). Set it before connecting Google Calendar and keep the same value across restarts. If it is unset, token encrypt/decrypt fails with a clear error instead of minting a random key.
 
@@ -93,7 +95,7 @@ cp .env.example .env
 docker compose up -d
 ```
 
-GudCal listens on `http://localhost:3000`.
+GudCal listens on `http://localhost:3000`. The app entrypoint runs `prisma migrate deploy` against `DATABASE_URL`. If this database was previously updated with `prisma db push`, follow [UPGRADE.md](UPGRADE.md) before the container can apply migration history.
 
 ### Docker directly
 

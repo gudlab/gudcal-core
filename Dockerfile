@@ -55,13 +55,16 @@ RUN adduser --system --uid 1001 nextjs
 # Install prisma CLI for running migrations at startup
 RUN npm install -g prisma@7
 
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/assets/fonts ./assets/fonts
-
 # Next.js standalone output
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
+COPY --from=builder /app/assets/fonts ./assets/fonts
+
+# prisma.config.ts imports dotenv/config; standalone tracing may omit it
+COPY --from=deps --chown=nextjs:nodejs /app/node_modules/dotenv ./node_modules/dotenv
 
 # Entrypoint script (auto-fills missing env vars)
 COPY --chown=nextjs:nodejs docker-entrypoint.sh ./
