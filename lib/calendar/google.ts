@@ -19,13 +19,13 @@ function getOAuth2Client() {
   );
 }
 
-export function getGoogleAuthUrl(userId: string): string {
+export function getGoogleAuthUrl(state: string): string {
   const oauth2Client = getOAuth2Client();
   return oauth2Client.generateAuthUrl({
     access_type: "offline",
     scope: SCOPES,
     prompt: "consent",
-    state: userId,
+    state,
   });
 }
 
