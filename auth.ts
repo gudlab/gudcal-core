@@ -1,10 +1,11 @@
 import authConfig from "@/auth.config";
 import { PrismaAdapter } from "@auth/prisma-adapter";
-import { UserRole } from "@/app/generated/prisma/client";
 import NextAuth, { type DefaultSession } from "next-auth";
 
+import { applyTokenToSession, jwtFromLookup } from "@/lib/auth-jwt";
 import { prisma } from "@/lib/db";
 import { getUserById } from "@/lib/user";
+import { UserRole } from "@/app/generated/prisma/client";
 
 // More info: https://authjs.dev/getting-started/typescript#module-augmentation
 declare module "next-auth" {
@@ -23,10 +24,7 @@ declare module "next-auth/jwt" {
   }
 }
 
-export const {
-  handlers,
-  auth,
-} = NextAuth({
+export const { handlers, auth } = NextAuth({
   adapter: PrismaAdapter(prisma),
   session: { strategy: "jwt" },
   pages: {
@@ -34,41 +32,13 @@ export const {
   },
   callbacks: {
     async session({ token, session }) {
-      if (session.user) {
-        if (token.sub) {
-          session.user.id = token.sub;
-        }
-
-        if (token.email) {
-          session.user.email = token.email;
-        }
-
-        if (token.role) {
-          session.user.role = token.role;
-        }
-
-        session.user.name = token.name;
-        session.user.image = token.picture;
-        session.user.username = token.username ?? null;
-      }
-
-      return session;
+      return applyTokenToSession(token, session) as typeof session;
     },
 
     async jwt({ token }) {
-      if (!token.sub) return token;
+      if (!token.sub) return null;
 
-      const dbUser = await getUserById(token.sub);
-
-      if (!dbUser) return token;
-
-      token.name = dbUser.name;
-      token.email = dbUser.email;
-      token.picture = dbUser.image;
-      token.role = dbUser.role;
-      token.username = dbUser.username;
-
-      return token;
+      return jwtFromLookup(token, await getUserById(token.sub));
     },
   },
   ...authConfig,
