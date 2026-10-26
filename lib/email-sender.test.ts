@@ -91,7 +91,7 @@ describe("bookingFromAddress", () => {
 });
 
 describe("invite-sender call sites", () => {
-  it("attaches ICS for confirmed create/reschedule/confirm and always on cancel", () => {
+  it("attaches ICS for confirmed create/reschedule/confirm and confirmed cancel", () => {
     const create = readFileSync("app/api/bookings/route.ts", "utf8");
     const reschedule = readFileSync("app/api/bookings/reschedule/route.ts", "utf8");
     const actions = readFileSync("actions/bookings.ts", "utf8");
@@ -106,13 +106,26 @@ describe("invite-sender call sites", () => {
     assert.match(reschedule, /uid: originalBooking\.uid/);
 
     const emails = readFileSync("lib/emails.ts", "utf8");
-    assert.match(emails, /rescheduleGuestIcsAttachments/);
-    assert.match(emails, /buildRescheduleIcsAttachments/);
+    assert.match(emails, /rescheduleGuestIcsEmails/);
+    assert.match(emails, /buildRescheduleGuestIcsEmails/);
     assert.match(emails, /method: "CANCEL", sequence: 1/);
+    assert.match(emails, /Previous time cancelled/);
+    assert.match(emails, /email\.method === "CANCEL"/);
+    assert.match(emails, /email\.method === "REQUEST"/);
+    assert.ok(
+      emails.indexOf("Previous time cancelled") <
+        emails.indexOf("Booking rescheduled:"),
+      "CANCEL guest email must be sent before the REQUEST reschedule email",
+    );
+    assert.match(emails, /Booking requested:/);
     assert.match(
       actions,
       /calendarInviteSent: updatedBooking\.status !== "CONFIRMED"/,
     );
+    const pendingCancelFlags = actions.match(
+      /calendarInviteSent: booking\.status !== "CONFIRMED"/g,
+    );
+    assert.equal(pendingCancelFlags?.length, 2);
     assert.doesNotMatch(actions, /calendarInviteSent:\s*Boolean\(/);
     assert.doesNotMatch(create, /calendarInviteSent:\s*Boolean\(/);
     assert.doesNotMatch(reschedule, /calendarInviteSent:\s*Boolean\(/);

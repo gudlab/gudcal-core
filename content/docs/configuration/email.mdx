@@ -35,4 +35,20 @@ RESEND_API_KEY = re_your_resend_api_key;
 
 For production, add and verify your domain in Resend to send emails from your own address (e.g. `notifications@gudcal.com`).
 
+Set `EMAIL_FROM` to that verified mailbox. Booking guest mail uses
+`HostName via GudCal <mailbox>` so Gmail shows the host name and the ICS
+`ORGANIZER` mailbox matches `From`. The default is
+`GudCal <noreply@mailman.gudcal.com>`.
+
+Confirmed guest mail attaches a `METHOD:REQUEST` ICS. Cancel of a confirmed
+booking attaches `METHOD:CANCEL`. Pending bookings do not get an ICS, including
+pending cancel (there was never a prior `REQUEST`).
+
+Reschedule of a confirmed booking sends two guest emails: `CANCEL` for the old
+UID, then `REQUEST` for the new UID. Some calendar clients ignore `CANCEL`
+when both files share one message.
+
+ICS attachments use a Base64 `content` string plus `contentType`, the shape
+Resend's JSON API documents. A Node `Buffer` is not that shape.
+
 </Steps>

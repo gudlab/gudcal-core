@@ -21,6 +21,7 @@ interface BookingConfirmationEmailProps {
   location?: string;
   bookingUid: string;
   isHost: boolean;        // different wording & links for host vs guest
+  isPending?: boolean;
   notes?: string;
 }
 
@@ -33,6 +34,7 @@ export default function BookingConfirmationEmail({
   location,
   bookingUid = "test-uid",
   isHost = false,
+  isPending = false,
   notes,
 }: BookingConfirmationEmailProps) {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
@@ -46,18 +48,32 @@ export default function BookingConfirmationEmail({
       <Head />
       <Preview>
         {isHost
-          ? `New booking: ${guestName} booked ${eventTitle}`
-          : `Booking confirmed: ${eventTitle} with ${hostName}`}
+          ? isPending
+            ? `New booking request: ${guestName} requested ${eventTitle}`
+            : `New booking: ${guestName} booked ${eventTitle}`
+          : isPending
+            ? `Booking requested: ${eventTitle} with ${hostName}`
+            : `Booking confirmed: ${eventTitle} with ${hostName}`}
       </Preview>
       <Body style={main}>
         <Container style={container}>
           <Heading style={h1}>
-            {isHost ? "New Booking" : "Booking Confirmed"}
+            {isHost
+              ? isPending
+                ? "New Booking Request"
+                : "New Booking"
+              : isPending
+                ? "Booking Requested"
+                : "Booking Confirmed"}
           </Heading>
           <Text style={text}>
             {isHost
-              ? `${guestName} has booked a ${eventTitle} with you.`
-              : `Your ${eventTitle} with ${hostName} has been confirmed.`}
+              ? isPending
+                ? `${guestName} has requested a ${eventTitle} with you.`
+                : `${guestName} has booked a ${eventTitle} with you.`
+              : isPending
+                ? `Your ${eventTitle} with ${hostName} is waiting for confirmation.`
+                : `Your ${eventTitle} with ${hostName} has been confirmed.`}
           </Text>
           <Section style={detailsSection}>
             <Text style={detailLabel}>What</Text>

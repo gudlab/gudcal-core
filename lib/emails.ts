@@ -6,7 +6,7 @@ import { bookingFromAddress } from "@/lib/email-sender";
 import {
   bookingIcsAttachment,
   buildBookingIcs,
-  buildRescheduleIcsAttachments,
+  buildRescheduleGuestIcsEmails,
   type BookingIcsInput,
 } from "@/lib/calendar/ics";
 import { handleResendSendResult } from "@/lib/resend-result";
@@ -151,7 +151,7 @@ function guestIcsAttachments(
   return [bookingIcsAttachment(ics, method)];
 }
 
-function rescheduleGuestIcsAttachments(data: RescheduleEmailData) {
+function rescheduleGuestIcsEmails(data: RescheduleEmailData) {
   const previous = data.previousInvite
     ? toBookingIcsInput(
         {
@@ -166,7 +166,7 @@ function rescheduleGuestIcsAttachments(data: RescheduleEmailData) {
     : undefined;
   const next = data.calendarInviteSent ? null : toBookingIcsInput(data);
 
-  return buildRescheduleIcsAttachments({
+  return buildRescheduleGuestIcsEmails({
     ...(previous && { previous }),
     ...(next && { next }),
   });
@@ -176,6 +176,7 @@ export async function sendBookingConfirmation(data: BookingEmailData) {
   const { guestEmail, hostEmail, additionalGuestEmails, ...rest } = data;
   const from = bookingFromAddress(data.hostName);
   const attachments = guestIcsAttachments(data);
+  const isPending = data.calendarInviteSent === true;
 
   try {
     // Send to guest (CC additional guests)
@@ -185,16 +186,20 @@ export async function sendBookingConfirmation(data: BookingEmailData) {
       ...(hostEmail && { replyTo: hostEmail }),
       ...(additionalGuestEmails?.length && { cc: additionalGuestEmails }),
       ...(attachments && { attachments }),
-      subject: `Booking confirmed: ${data.eventTitle} with ${data.hostName}`,
-      react: BookingConfirmationEmail({ ...rest, isHost: false }),
+      subject: isPending
+        ? `Booking requested: ${data.eventTitle} with ${data.hostName}`
+        : `Booking confirmed: ${data.eventTitle} with ${data.hostName}`,
+      react: BookingConfirmationEmail({ ...rest, isHost: false, isPending }),
     });
 
     // Send to host
     await resend.emails.send({
       from: FROM_EMAIL,
       to: hostEmail,
-      subject: `New booking: ${data.guestName} booked ${data.eventTitle}`,
-      react: BookingConfirmationEmail({ ...rest, isHost: true }),
+      subject: isPending
+        ? `New booking request: ${data.guestName} requested ${data.eventTitle}`
+        : `New booking: ${data.guestName} booked ${data.eventTitle}`,
+      react: BookingConfirmationEmail({ ...rest, isHost: true, isPending }),
     });
   } catch (error) {
     console.error("Error sending booking confirmation:", error);
@@ -293,16 +298,31 @@ export async function sendBookingRescheduled(data: RescheduleEmailData) {
     ...rest
   } = data;
   const from = bookingFromAddress(data.hostName);
-  const attachments = rescheduleGuestIcsAttachments(data);
+  const guestIcsEmails = rescheduleGuestIcsEmails(data);
+  const cancelEmail = guestIcsEmails.find((email) => email.method === "CANCEL");
+  const requestEmail = guestIcsEmails.find((email) => email.method === "REQUEST");
 
   try {
-    // Send to guest (CC additional guests)
+    // CANCEL first, then REQUEST. Some clients ignore CANCEL when both ICS
+    // share one email.
+    if (cancelEmail) {
+      await resend.emails.send({
+        from,
+        to: guestEmail,
+        ...(hostEmail && { replyTo: hostEmail }),
+        ...(additionalGuestEmails?.length && { cc: additionalGuestEmails }),
+        attachments: cancelEmail.attachments,
+        subject: `Previous time cancelled: ${data.eventTitle}`,
+        react: BookingRescheduledEmail({ ...rest, isHost: false }),
+      });
+    }
+
     await resend.emails.send({
       from,
       to: guestEmail,
       ...(hostEmail && { replyTo: hostEmail }),
       ...(additionalGuestEmails?.length && { cc: additionalGuestEmails }),
-      ...(attachments.length && { attachments }),
+      ...(requestEmail && { attachments: requestEmail.attachments }),
       subject: `Booking rescheduled: ${data.eventTitle} with ${data.hostName}`,
       react: BookingRescheduledEmail({ ...rest, isHost: false }),
     });

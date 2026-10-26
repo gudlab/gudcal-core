@@ -98,6 +98,7 @@ export async function cancelBooking(bookingId: string, reason?: string) {
       const emailData = buildBookingEmailData({
         ...updatedBooking,
         additionalGuests: updatedBooking.additionalGuests,
+        calendarInviteSent: booking.status !== "CONFIRMED",
       });
       sendBookingCancellation(emailData).catch(() => {});
     }
@@ -216,6 +217,7 @@ export async function cancelBookingAsGuest(
       const emailData = buildBookingEmailData({
         ...updatedBooking,
         additionalGuests: updatedBooking.additionalGuests,
+        calendarInviteSent: booking.status !== "CONFIRMED",
       });
       sendBookingCancellation(emailData).catch(() => {});
     }
