@@ -27,6 +27,7 @@ jobs:
       - uses: pnpm/action-setup@v4
         with:
           version: 10
+      # Prisma 7 requires Node 20.19+, 22.12+, or 24.0+. .nvmrc is 20.19.0.
       - uses: actions/setup-node@v4
         with:
           node-version-file: ".nvmrc"
