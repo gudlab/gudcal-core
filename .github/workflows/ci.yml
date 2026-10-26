@@ -7,13 +7,13 @@ on:
     branches: [main]
 
 jobs:
-  date-helpers:
-    name: Date helpers
+  unit-tests:
+    name: Unit tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version-file: ".nvmrc"
-      - name: Civil-date tests
-        run: npx --yes tsx --test lib/booking-dates.test.ts
+      - name: Run unit tests
+        run: npx --yes tsx --test lib/booking-dates.test.ts lib/calendar/oauth-state.test.ts
