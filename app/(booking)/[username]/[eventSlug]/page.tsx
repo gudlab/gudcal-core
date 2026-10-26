@@ -40,10 +40,16 @@ export async function generateMetadata({
 
 export default async function EventBookingPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ username: string; eventSlug: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { username, eventSlug } = await params;
+  const sp = await searchParams;
+  const first = (v: string | string[] | undefined) =>
+    Array.isArray(v) ? v[0] : v;
+  const initialTimezone = first(sp.timezone);
 
   const user = await prisma.user.findUnique({
     where: { username },
@@ -87,6 +93,7 @@ export default async function EventBookingPage({
   return (
     <div className="mx-auto w-full max-w-4xl">
       <BookingWidget
+        initialTimezone={initialTimezone}
         eventType={{
           id: eventType.id,
           title: eventType.title,

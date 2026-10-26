@@ -4,11 +4,17 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { getAvailableSlots } from "@/lib/availability";
 import {
+  groupSlotsByGuestDate,
+  isDateKey,
+  resolveTimeZone,
+  zonedEndOfDay,
+  zonedStartOfDay,
+} from "@/lib/booking-dates";
+import {
   mcpLoadAvailabilityBusyTimes,
   mcpRefuseWriteIfCalendarBusy,
 } from "@/lib/mcp/calendar-busy";
 import { addDays, addMinutes, startOfDay, endOfDay } from "date-fns";
-import { fromZonedTime } from "date-fns-tz";
 import { randomBytes } from "crypto";
 
 // ─── Helper: validate API key and return user ──────────────
@@ -108,10 +114,18 @@ export function createMcpServer() {
       timezone: z
         .string()
         .optional()
-        .describe("Guest timezone (defaults to UTC)"),
+        .describe(
+          "Guest IANA timezone for dateFrom/dateTo and returned day buckets (defaults to UTC)",
+        ),
     },
     async ({ username, eventSlug, dateFrom, dateTo, timezone }) => {
-      const guestTimezone = timezone ?? "UTC";
+      const guestTimezone = resolveTimeZone(timezone);
+      if (
+        (dateFrom && !isDateKey(dateFrom)) ||
+        (dateTo && !isDateKey(dateTo))
+      ) {
+        return errorResponse("dateFrom and dateTo must be YYYY-MM-DD.");
+      }
 
       const user = await prisma.user.findUnique({
         where: { username },
@@ -151,20 +165,10 @@ export function createMcpServer() {
 
       const now = new Date();
       const startDate = dateFrom
-        ? startOfDay(
-            fromZonedTime(
-              new Date(dateFrom + "T00:00:00"),
-              availability.timezone,
-            ),
-          )
+        ? zonedStartOfDay(dateFrom, guestTimezone)
         : startOfDay(now);
       const endDate = dateTo
-        ? endOfDay(
-            fromZonedTime(
-              new Date(dateTo + "T23:59:59"),
-              availability.timezone,
-            ),
-          )
+        ? zonedEndOfDay(dateTo, guestTimezone)
         : endOfDay(addDays(now, 6));
 
       const existingBookings = await prisma.booking.findMany({
@@ -212,13 +216,22 @@ export function createMcpServer() {
         guestTimezone,
       });
 
-      const formatted = slots
-        .filter((day) => day.slots.length > 0)
-        .map((day) => ({
+      const formatted = groupSlotsByGuestDate(
+        slots.map((day) => ({
           date: day.date,
           slots: day.slots.map((s) => ({
             start: s.start.toISOString(),
             end: s.end.toISOString(),
+          })),
+        })),
+        guestTimezone,
+      )
+        .filter((day) => day.slots.length > 0)
+        .map((day) => ({
+          date: day.date,
+          slots: day.slots.map((s) => ({
+            start: s.start,
+            end: s.end ?? s.start,
           })),
         }));
 

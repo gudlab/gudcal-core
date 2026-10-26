@@ -1,10 +1,16 @@
 import { NextResponse } from "next/server";
 import { addDays, startOfDay, endOfDay } from "date-fns";
-import { fromZonedTime } from "date-fns-tz";
 
 import { prisma } from "@/lib/db";
 import { getAvailableSlots } from "@/lib/availability";
 import { getBusyTimesForRead } from "@/lib/calendar/busy";
+import {
+  isDateKey,
+  isoSlotsByGuestDate,
+  resolveTimeZone,
+  zonedEndOfDay,
+  zonedStartOfDay,
+} from "@/lib/booking-dates";
 
 export async function GET(
   request: Request,
@@ -17,8 +23,19 @@ export async function GET(
     const singleDate = searchParams.get("date"); // YYYY-MM-DD (single day shorthand)
     const dateFrom = searchParams.get("from") ?? singleDate; // YYYY-MM-DD
     const dateTo = searchParams.get("to") ?? singleDate; // YYYY-MM-DD
-    const guestTimezone =
-      searchParams.get("timezone") ?? "America/New_York";
+    // Guest IANA zone: from/to civil dates and response day.date buckets.
+    // Host availability windows still use availability.timezone internally.
+    const guestTimezone = resolveTimeZone(searchParams.get("timezone"));
+
+    if (
+      (dateFrom && !isDateKey(dateFrom)) ||
+      (dateTo && !isDateKey(dateTo))
+    ) {
+      return NextResponse.json(
+        { error: "from and to must be YYYY-MM-DD" },
+        { status: 400 },
+      );
+    }
 
     if (!eventSlug) {
       return NextResponse.json(
@@ -75,23 +92,13 @@ export async function GET(
       );
     }
 
-    // Date range - default to next 7 days
+    // Date range — civil from/to are guest-local, not host-local.
     const now = new Date();
     const startDate = dateFrom
-      ? startOfDay(
-          fromZonedTime(
-            new Date(dateFrom + "T00:00:00"),
-            availability.timezone,
-          ),
-        )
+      ? zonedStartOfDay(dateFrom, guestTimezone)
       : startOfDay(now);
     const endDate = dateTo
-      ? endOfDay(
-          fromZonedTime(
-            new Date(dateTo + "T23:59:59"),
-            availability.timezone,
-          ),
-        )
+      ? zonedEndOfDay(dateTo, guestTimezone)
       : endOfDay(addDays(now, 6));
 
     // Get ALL existing bookings for this host in range (not just this event type)
@@ -139,16 +146,12 @@ export async function GET(
       guestTimezone,
     });
 
-    // Return structured response with date-grouped slots
-    const slots = daySlots.map((day) => ({
-      date: day.date,
-      slots: day.slots.map((slot) => ({
-        start: slot.start.toISOString(),
-        end: slot.end.toISOString(),
-      })),
-    }));
-
-    return NextResponse.json({ slots, timezone: guestTimezone });
+    return NextResponse.json({
+      slots: isoSlotsByGuestDate(daySlots, guestTimezone),
+      timezone: guestTimezone,
+      hostTimezone: availability.timezone,
+      guestTimezone,
+    });
   } catch (error) {
     console.error("Availability error:", error);
     return NextResponse.json(

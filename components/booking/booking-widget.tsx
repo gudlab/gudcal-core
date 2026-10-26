@@ -9,6 +9,7 @@ import {
   formatDisplayDate,
   formatDisplayTime,
   groupSlotsByGuestDate,
+  resolveGuestTimeZone,
   zonedYmd,
 } from "@/lib/booking-dates";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -18,6 +19,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { GuestTimezonePicker } from "@/components/booking/guest-timezone-picker";
 import { Icons } from "@/components/shared/icons";
 
 // ────────────────────────────────────────────────────────────
@@ -58,6 +60,8 @@ interface BookingWidgetProps {
   user: UserData;
   rescheduleUid?: string;
   prefillGuest?: PrefillGuest;
+  /** Guest IANA zone from `?timezone=` (embed or shared link). */
+  initialTimezone?: string;
 }
 
 interface TimeSlot {
@@ -73,7 +77,9 @@ interface DayAvailability {
 
 interface AvailabilityResponse {
   slots: DayAvailability[];
-  timezone: string;
+  timezone?: string;
+  hostTimezone?: string;
+  guestTimezone?: string;
 }
 
 type Step = "date" | "time" | "form" | "confirmation";
@@ -81,14 +87,6 @@ type Step = "date" | "time" | "form" | "confirmation";
 // ────────────────────────────────────────────────────────────
 // Helpers
 // ────────────────────────────────────────────────────────────
-
-function getGuestTimezone(): string {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone;
-  } catch {
-    return "UTC";
-  }
-}
 
 function getDaysInMonth(year: number, month: number): number {
   return new Date(year, month + 1, 0).getDate();
@@ -127,11 +125,16 @@ const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 // Component
 // ────────────────────────────────────────────────────────────
 
-export function BookingWidget({ eventType, user, rescheduleUid, prefillGuest }: BookingWidgetProps) {
+export function BookingWidget({
+  eventType,
+  user,
+  rescheduleUid,
+  prefillGuest,
+  initialTimezone,
+}: BookingWidgetProps) {
   const isReschedule = !!rescheduleUid;
-  const guestTimezone = useMemo(
-    () => prefillGuest?.timezone ?? getGuestTimezone(),
-    [prefillGuest?.timezone],
+  const [guestTimezone, setGuestTimezone] = useState(() =>
+    resolveGuestTimeZone(initialTimezone || prefillGuest?.timezone),
   );
 
   // Step management
@@ -174,6 +177,24 @@ export function BookingWidget({ eventType, user, rescheduleUid, prefillGuest }: 
     uid: string;
     status: string;
   } | null>(null);
+
+  const handleTimezoneChange = (next: string) => {
+    const tz = resolveGuestTimeZone(next);
+    setGuestTimezone(tz);
+    setSelectedDate(null);
+    setSelectedSlot(null);
+    setSlots([]);
+    setSlotsError(null);
+    setStep("date");
+    const parts = zonedYmd(new Date(), tz);
+    setViewYear(parts.year);
+    setViewMonth(parts.month);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.set("timezone", tz);
+      window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+    }
+  };
 
   // ── Fetch entire month's availability ────────────────────
   const fetchMonthAvailability = useCallback(
@@ -480,9 +501,13 @@ export function BookingWidget({ eventType, user, rescheduleUid, prefillGuest }: 
                 {LOCATION_LABELS[eventType.locationType] ?? eventType.locationType}
               </span>
             </div>
-            <div className="flex items-center gap-2">
-              <Icons.globe className="size-4 shrink-0" />
-              <span>{guestTimezone}</span>
+            <div className="flex items-start gap-2">
+              <Icons.globe className="mt-1.5 size-4 shrink-0" />
+              <GuestTimezonePicker
+                value={guestTimezone}
+                onChange={handleTimezoneChange}
+                className="h-8 flex-1"
+              />
             </div>
           </div>
 
