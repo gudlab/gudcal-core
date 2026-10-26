@@ -4,7 +4,7 @@ import { toZonedTime } from "date-fns-tz";
 import Link from "next/link";
 
 import { prisma } from "@/lib/db";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -12,6 +12,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Icons } from "@/components/shared/icons";
+
+export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Booking Confirmation – GudCal",
@@ -140,9 +142,12 @@ export default async function BookingPage({ params }: BookingPageProps) {
           <Button variant="outline" asChild>
             <Link href={`/booking/${uid}/reschedule`}>Reschedule</Link>
           </Button>
-          <Button variant="outline" asChild>
-            <Link href={`/booking/${uid}/cancel`}>Cancel Booking</Link>
-          </Button>
+          <a
+            href={`/booking/${uid}/cancel`}
+            className={buttonVariants({ variant: "outline" })}
+          >
+            Cancel Booking
+          </a>
         </div>
       )}
     </div>

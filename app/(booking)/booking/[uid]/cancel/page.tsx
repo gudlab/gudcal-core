@@ -1,7 +1,16 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { prisma } from "@/lib/db";
-import { GuestCancelForm } from "@/components/bookings/guest-cancel-form";
+import {
+  GuestCancelForm,
+  GuestCancelSuccess,
+} from "@/components/bookings/guest-cancel-form";
+import {
+  shouldShowGuestCancelSuccess,
+  shouldStripCancelledQuery,
+} from "@/lib/guest-cancel";
+
+export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Cancel Booking – GudCal",
@@ -9,10 +18,15 @@ export const metadata = {
 
 interface CancelBookingPageProps {
   params: Promise<{ uid: string }>;
+  searchParams: Promise<{ cancelled?: string }>;
 }
 
-export default async function CancelBookingPage({ params }: CancelBookingPageProps) {
+export default async function CancelBookingPage({
+  params,
+  searchParams,
+}: CancelBookingPageProps) {
   const { uid } = await params;
+  const { cancelled } = await searchParams;
 
   const booking = await prisma.booking.findUnique({
     where: { uid },
@@ -24,15 +38,16 @@ export default async function CancelBookingPage({ params }: CancelBookingPagePro
 
   if (!booking) notFound();
 
-  if (booking.status === "CANCELLED") {
+  if (shouldShowGuestCancelSuccess(booking.status)) {
     return (
-      <div className="mx-auto max-w-md space-y-4 text-center">
-        <h1 className="text-2xl font-bold">Booking Already Cancelled</h1>
-        <p className="text-muted-foreground">
-          This booking has already been cancelled.
-        </p>
+      <div className="mx-auto max-w-md">
+        <GuestCancelSuccess />
       </div>
     );
+  }
+
+  if (shouldStripCancelledQuery(booking.status, cancelled)) {
+    redirect(`/booking/${uid}/cancel`);
   }
 
   return (
