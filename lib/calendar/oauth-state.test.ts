@@ -12,6 +12,15 @@ import {
 
 const TEST_SECRET = "unit-test-oauth-state-secret";
 
+function assignNodeEnv(value: string | undefined) {
+  const env = process.env as { NODE_ENV?: string };
+  if (value === undefined) {
+    delete env.NODE_ENV;
+  } else {
+    env.NODE_ENV = value;
+  }
+}
+
 describe("Google calendar OAuth state", () => {
   const previousAuthSecret = process.env.AUTH_SECRET;
   const previousNextAuthSecret = process.env.NEXTAUTH_SECRET;
@@ -131,7 +140,7 @@ describe("Google calendar OAuth state", () => {
     assert.deepEqual(replayWrongNonce, { ok: false, error: "invalid_state" });
   });
 
-  it("sets the nonce cookie Secure flag from the public HTTPS URL, not NODE_ENV", () => {
+  it("sets the nonce cookie Secure flag from the runtime public HTTPS URL, not NODE_ENV", () => {
     const previousAppUrl = process.env.NEXT_PUBLIC_APP_URL;
     const previousFallbackUrl = process.env.APP_URL;
     const previousNodeEnv = process.env.NODE_ENV;
@@ -147,31 +156,55 @@ describe("Google calendar OAuth state", () => {
       } else {
         process.env.APP_URL = previousFallbackUrl;
       }
-      if (previousNodeEnv === undefined) {
-        delete process.env.NODE_ENV;
-      } else {
-        process.env.NODE_ENV = previousNodeEnv;
-      }
+      assignNodeEnv(previousNodeEnv);
     };
 
     try {
-      process.env.NODE_ENV = "production";
-      process.env.NEXT_PUBLIC_APP_URL = "http://192.168.1.10:3000";
-      delete process.env.APP_URL;
+      // Runtime APP_URL wins over a baked-in HTTP NEXT_PUBLIC_APP_URL.
+      assignNodeEnv("development");
+      process.env.APP_URL = "https://cal.example.com";
+      process.env.NEXT_PUBLIC_APP_URL = "http://localhost:3000";
+      assert.equal(oauthNonceCookieOptions(600).secure, true);
+
+      // Runtime HTTP APP_URL wins over an HTTPS NEXT_PUBLIC value.
+      assignNodeEnv("production");
+      process.env.APP_URL = "http://192.168.1.10:3000";
+      process.env.NEXT_PUBLIC_APP_URL = "https://cal.example.com";
       assert.equal(oauthNonceCookieOptions(600).secure, false);
 
+      // Whitespace APP_URL falls through to NEXT_PUBLIC_APP_URL.
+      process.env.APP_URL = "   ";
       process.env.NEXT_PUBLIC_APP_URL = "https://cal.example.com";
-      process.env.NODE_ENV = "development";
       assert.equal(oauthNonceCookieOptions(600).secure, true);
+
+      // Whitespace NEXT_PUBLIC_APP_URL does not block APP_URL.
+      process.env.APP_URL = "https://cal.example.com";
+      process.env.NEXT_PUBLIC_APP_URL = "   ";
+      assert.equal(oauthNonceCookieOptions(600).secure, true);
+
+      delete process.env.APP_URL;
+      process.env.NEXT_PUBLIC_APP_URL = "http://192.168.1.10:3000";
+      assignNodeEnv("production");
+      assert.equal(oauthNonceCookieOptions(600).secure, false);
 
       delete process.env.NEXT_PUBLIC_APP_URL;
       process.env.APP_URL = "https://cal.example.com";
-      process.env.NODE_ENV = "production";
+      assignNodeEnv("production");
       assert.equal(oauthNonceCookieOptions(600).secure, true);
 
-      delete process.env.NEXT_PUBLIC_APP_URL;
       delete process.env.APP_URL;
-      process.env.NODE_ENV = "production";
+      delete process.env.NEXT_PUBLIC_APP_URL;
+      assert.equal(
+        oauthNonceCookieOptions(
+          600,
+          "https://cal.example.com/api/calendar/google/connect",
+        ).secure,
+        true,
+      );
+
+      delete process.env.APP_URL;
+      delete process.env.NEXT_PUBLIC_APP_URL;
+      assignNodeEnv("production");
       assert.equal(oauthNonceCookieOptions(600).secure, false);
     } finally {
       restore();
