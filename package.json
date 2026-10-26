@@ -15,7 +15,7 @@
     "postinstall": "prisma generate",
     "email": "email dev --dir emails --port 3333",
     "remove-content": "node ./setup.mjs",
-    "test": "tsx --test lib/booking-dates.test.ts"
+    "test": "tsx --test lib/booking-dates.test.ts lib/calendar/oauth-state.test.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",

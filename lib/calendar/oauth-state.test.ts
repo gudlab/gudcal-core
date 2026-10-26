@@ -1,0 +1,145 @@
+import assert from "node:assert/strict";
+import { afterEach, beforeEach, describe, it } from "node:test";
+
+import {
+  OAUTH_STATE_TTL_MS,
+  consumeOauthState,
+  createOauthState,
+  hasOauthStateSecret,
+  verifyOauthState,
+} from "./oauth-state";
+
+const TEST_SECRET = "unit-test-oauth-state-secret";
+
+describe("Google calendar OAuth state", () => {
+  const previousAuthSecret = process.env.AUTH_SECRET;
+  const previousNextAuthSecret = process.env.NEXTAUTH_SECRET;
+
+  beforeEach(() => {
+    process.env.AUTH_SECRET = TEST_SECRET;
+    delete process.env.NEXTAUTH_SECRET;
+  });
+
+  afterEach(() => {
+    if (previousAuthSecret === undefined) {
+      delete process.env.AUTH_SECRET;
+    } else {
+      process.env.AUTH_SECRET = previousAuthSecret;
+    }
+    if (previousNextAuthSecret === undefined) {
+      delete process.env.NEXTAUTH_SECRET;
+    } else {
+      process.env.NEXTAUTH_SECRET = previousNextAuthSecret;
+    }
+  });
+
+  it("round-trips a signed state for the same user and nonce", () => {
+    const now = 1_700_000_000_000;
+    const { state, nonce, exp } = createOauthState("user-abc", now);
+
+    const verified = verifyOauthState(state, now);
+    assert.equal(verified.ok, true);
+    if (!verified.ok) return;
+    assert.equal(verified.payload.userId, "user-abc");
+    assert.equal(verified.payload.nonce, nonce);
+    assert.equal(verified.payload.exp, exp);
+
+    const consumed = consumeOauthState({
+      state,
+      sessionUserId: "user-abc",
+      cookieNonce: nonce,
+      now,
+    });
+    assert.deepEqual(consumed, { ok: true, userId: "user-abc" });
+  });
+
+  it("rejects a tampered state", () => {
+    const now = 1_700_000_000_000;
+    const { state, nonce } = createOauthState("user-abc", now);
+    const [payload, signature] = state.split(".");
+    const flipped = payload.endsWith("A") ? "B" : "A";
+    const tampered = `${payload.slice(0, -1)}${flipped}.${signature}`;
+
+    const verified = verifyOauthState(tampered, now);
+    assert.deepEqual(verified, { ok: false, error: "invalid_state" });
+
+    const consumed = consumeOauthState({
+      state: tampered,
+      sessionUserId: "user-abc",
+      cookieNonce: nonce,
+      now,
+    });
+    assert.deepEqual(consumed, { ok: false, error: "invalid_state" });
+  });
+
+  it("rejects an expired state", () => {
+    const now = 1_700_000_000_000;
+    const { state, nonce } = createOauthState("user-abc", now);
+
+    const consumed = consumeOauthState({
+      state,
+      sessionUserId: "user-abc",
+      cookieNonce: nonce,
+      now: now + OAUTH_STATE_TTL_MS + 1,
+    });
+    assert.deepEqual(consumed, { ok: false, error: "invalid_state" });
+  });
+
+  it("rejects a valid state when the session user does not match", () => {
+    const now = 1_700_000_000_000;
+    const { state, nonce } = createOauthState("user-abc", now);
+
+    const consumed = consumeOauthState({
+      state,
+      sessionUserId: "user-other",
+      cookieNonce: nonce,
+      now,
+    });
+    assert.deepEqual(consumed, { ok: false, error: "session_mismatch" });
+  });
+
+  it("rejects a replay when the nonce cookie does not match", () => {
+    const now = 1_700_000_000_000;
+    const { state, nonce } = createOauthState("user-abc", now);
+
+    const first = consumeOauthState({
+      state,
+      sessionUserId: "user-abc",
+      cookieNonce: nonce,
+      now,
+    });
+    assert.equal(first.ok, true);
+
+    const replayWithoutCookie = consumeOauthState({
+      state,
+      sessionUserId: "user-abc",
+      cookieNonce: undefined,
+      now,
+    });
+    assert.deepEqual(replayWithoutCookie, {
+      ok: false,
+      error: "invalid_state",
+    });
+
+    const replayWrongNonce = consumeOauthState({
+      state,
+      sessionUserId: "user-abc",
+      cookieNonce: "0".repeat(nonce.length),
+      now,
+    });
+    assert.deepEqual(replayWrongNonce, { ok: false, error: "invalid_state" });
+  });
+
+  it("reports a missing signing secret", () => {
+    delete process.env.AUTH_SECRET;
+    delete process.env.NEXTAUTH_SECRET;
+    assert.equal(hasOauthStateSecret(), false);
+
+    const consumed = consumeOauthState({
+      state: "not-a-state",
+      sessionUserId: "user-abc",
+      cookieNonce: "nonce",
+    });
+    assert.deepEqual(consumed, { ok: false, error: "missing_secret" });
+  });
+});
