@@ -639,7 +639,7 @@ export function createMcpServer() {
         .number()
         .min(0)
         .optional()
-        .describe("Minimum advance notice in minutes (default: 120)"),
+        .describe("Minimum advance notice in minutes (default: 60)"),
       maxBookingsPerDay: z
         .number()
         .min(1)

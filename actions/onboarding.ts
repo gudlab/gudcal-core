@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import { DEFAULT_MINIMUM_NOTICE_MINUTES } from "@/lib/validations/event-type";
 import {
   onboardingSchema,
   type OnboardingFormData,
@@ -83,7 +84,7 @@ export async function completeOnboarding(data: OnboardingFormData) {
               isActive: true,
               bufferBefore: 0,
               bufferAfter: 5,
-              minimumNotice: 120,
+              minimumNotice: DEFAULT_MINIMUM_NOTICE_MINUTES,
               availabilityId: availability.id,
             },
             {
@@ -98,7 +99,7 @@ export async function completeOnboarding(data: OnboardingFormData) {
               isActive: true,
               bufferBefore: 0,
               bufferAfter: 0,
-              minimumNotice: 120,
+              minimumNotice: DEFAULT_MINIMUM_NOTICE_MINUTES,
               availabilityId: availability.id,
             },
             {

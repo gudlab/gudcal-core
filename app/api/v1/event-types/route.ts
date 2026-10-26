@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { prisma } from "@/lib/db";
 import { authenticateApiKey } from "@/lib/api-auth";
+import { DEFAULT_MINIMUM_NOTICE_MINUTES } from "@/lib/validations/event-type";
 
 // GET /api/v1/event-types — List all event types for authenticated user
 export async function GET(req: Request) {
@@ -65,7 +66,7 @@ export async function POST(req: Request) {
       bufferBefore = 0,
       bufferAfter = 0,
       maxBookingsPerDay,
-      minimumNotice = 120,
+      minimumNotice = DEFAULT_MINIMUM_NOTICE_MINUTES,
       slotInterval,
       schedulingType = "INDIVIDUAL",
       price,
