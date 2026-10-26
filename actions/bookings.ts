@@ -152,6 +152,7 @@ export async function confirmBooking(bookingId: string) {
         ...updatedBooking,
         location: calResult?.meetLink ?? updatedBooking.location,
         additionalGuests: updatedBooking.additionalGuests,
+        calendarInviteSent: updatedBooking.status !== "CONFIRMED",
       });
       sendBookingConfirmation(emailData).catch(() => {});
     }

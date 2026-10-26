@@ -222,6 +222,7 @@ export async function POST(request: Request) {
         additionalGuests: newBooking.additionalGuests,
         eventType: { title: eventType.title, locationValue: eventType.locationValue },
         host: { name: originalBooking.host.name, email: originalBooking.host.email },
+        calendarInviteSent: newBooking.status !== "CONFIRMED",
       });
 
       const oldGuestStart = toZonedTime(originalBooking.startTime, originalBooking.guestTimezone);
