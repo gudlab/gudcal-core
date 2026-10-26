@@ -12,8 +12,9 @@ Thanks for wanting to help. The public source-available repo is [gudlab/gudcal-c
 ## Local setup
 
 ```bash
-pnpm install
 cp .env.example .env.local
+# Set DATABASE_URL before install (`prisma.config.ts` / postinstall prisma generate)
+pnpm install
 pnpm prisma generate
 pnpm prisma db push   # local-dev only; Docker / production use migrate deploy
 pnpm dev

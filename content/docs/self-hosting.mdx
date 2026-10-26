@@ -35,16 +35,16 @@ git clone https://github.com/gudlab/gudcal-core.git
 cd gudcal-core
 ```
 
-2. Install dependencies:
-
-```bash
-pnpm install
-```
-
-3. Copy the environment file and configure it:
+2. Copy the environment file and set `DATABASE_URL` (required before install; `prisma.config.ts` reads it during `pnpm install` / `prisma generate`):
 
 ```bash
 cp .env.example .env.local
+```
+
+3. Install dependencies:
+
+```bash
+pnpm install
 ```
 
 4. Set up the database:
@@ -54,7 +54,7 @@ pnpm prisma generate
 pnpm prisma migrate deploy
 ```
 
-`db push` is a local-dev shortcut only. Production and Docker use `migrate deploy`. If this database was previously created with `db push`, baseline it first: [UPGRADE.md](https://github.com/gudlab/gudcal-core/blob/main/UPGRADE.md).
+`db push` is a local-dev shortcut only. Production and Docker use `migrate deploy`. If this database was previously created with `db push`, baseline it first: [UPGRADE.md](https://github.com/gudlab/gudcal-core/blob/main/UPGRADE.md). From Compose, record the baseline with `--entrypoint prisma` so the image does not run `migrate deploy` first.
 
 5. Start the application:
 

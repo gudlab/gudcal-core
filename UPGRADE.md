@@ -43,10 +43,10 @@ pnpm prisma migrate resolve --applied 20261026120000_baseline
 
 This only inserts a row in `_prisma_migrations`. It does not change tables or data.
 
-With Docker, use the same image and `DATABASE_URL` as the app, for example:
+With Docker, use the same image and `DATABASE_URL` as the app, and **bypass the image `ENTRYPOINT`**. The entrypoint runs `prisma migrate deploy` before your command. Without `--entrypoint`, that deploy hits **P3005** and `resolve` never runs:
 
 ```bash
-docker compose run --rm app prisma migrate resolve --applied 20261026120000_baseline
+docker compose run --rm --entrypoint prisma app migrate resolve --applied 20261026120000_baseline
 ```
 
 ### 3. Start the app (or run deploy)
