@@ -2,12 +2,14 @@ import { format } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
 
 import { resend } from "@/lib/email";
+import { handleResendSendResult } from "@/lib/resend-result";
 import { env } from "@/env.mjs";
 
 import BookingConfirmationEmail from "@/emails/booking-confirmation";
 import BookingCancellationEmail from "@/emails/booking-cancellation";
 import BookingReminderEmail from "@/emails/booking-reminder";
 import BookingRescheduledEmail from "@/emails/booking-rescheduled";
+import OAuthSignInReminderEmail from "@/emails/oauth-signin-reminder";
 import PasswordResetEmail from "@/emails/password-reset";
 
 const FROM_EMAIL = process.env.EMAIL_FROM ?? "GudCal <noreply@mailman.gudcal.com>";
@@ -151,16 +153,31 @@ export async function sendPasswordResetEmail({
   firstName: string;
   resetUrl: string;
 }) {
-  try {
-    await resend.emails.send({
-      from: FROM_EMAIL,
-      to: email,
-      subject: "Reset your GudCal password",
-      react: PasswordResetEmail({ firstName, resetUrl }),
-    });
-  } catch (error) {
-    console.error("Error sending password reset email:", error);
-  }
+  const result = await resend.emails.send({
+    from: FROM_EMAIL,
+    to: email,
+    subject: "Reset your GudCal password",
+    react: PasswordResetEmail({ firstName, resetUrl }),
+  });
+  handleResendSendResult(result, email, { throwOnError: true });
+}
+
+export async function sendOAuthSignInEmail({
+  email,
+  firstName,
+  loginUrl,
+}: {
+  email: string;
+  firstName: string;
+  loginUrl: string;
+}) {
+  const result = await resend.emails.send({
+    from: FROM_EMAIL,
+    to: email,
+    subject: "Sign in to GudCal with Google",
+    react: OAuthSignInReminderEmail({ firstName, loginUrl }),
+  });
+  handleResendSendResult(result, email, { throwOnError: true });
 }
 
 export async function sendBookingReminder(data: Omit<BookingEmailData, "cancelReason">) {
