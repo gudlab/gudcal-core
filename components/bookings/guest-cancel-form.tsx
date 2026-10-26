@@ -15,6 +15,22 @@ interface GuestCancelFormProps {
   bookingUid: string;
 }
 
+export function GuestCancelSuccess() {
+  return (
+    <div className="space-y-4 text-center">
+      <div className="flex justify-center">
+        <div className="flex size-12 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
+          <Icons.check className="size-6 text-green-600" />
+        </div>
+      </div>
+      <h2 className="text-xl font-semibold">Booking Cancelled</h2>
+      <p className="text-muted-foreground">
+        Your booking has been cancelled. A confirmation email will be sent shortly.
+      </p>
+    </div>
+  );
+}
+
 export function GuestCancelForm({ bookingUid }: GuestCancelFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -30,28 +46,17 @@ export function GuestCancelForm({ bookingUid }: GuestCancelFormProps) {
 
     startTransition(async () => {
       const result = await cancelBookingAsGuest(bookingUid, email, reason || undefined);
-      if (result.status === "success") {
+      if (result?.status === "success") {
         setCancelled(true);
+        router.replace(`/booking/${bookingUid}/cancel?cancelled=1`, { scroll: false });
       } else {
-        toast.error(result.message);
+        toast.error(result?.message ?? "Something went wrong");
       }
     });
   };
 
   if (cancelled) {
-    return (
-      <div className="space-y-4 text-center">
-        <div className="flex justify-center">
-          <div className="flex size-12 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
-            <Icons.check className="size-6 text-green-600" />
-          </div>
-        </div>
-        <h2 className="text-xl font-semibold">Booking Cancelled</h2>
-        <p className="text-muted-foreground">
-          Your booking has been cancelled. A confirmation email will be sent shortly.
-        </p>
-      </div>
-    );
+    return <GuestCancelSuccess />;
   }
 
   return (

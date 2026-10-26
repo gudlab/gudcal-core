@@ -217,6 +217,10 @@ export async function cancelBookingAsGuest(
       sendBookingCancellation(emailData).catch(() => {});
     }
 
+    revalidatePath(`/booking/${bookingUid}`);
+    revalidatePath(`/booking/${bookingUid}/cancel`);
+    revalidatePath("/dashboard/bookings");
+
     return { status: "success" as const };
   } catch (error) {
     if (error instanceof Error) {
