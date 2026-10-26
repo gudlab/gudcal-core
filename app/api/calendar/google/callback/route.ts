@@ -23,7 +23,11 @@ function redirectToIntegrations(
   }
 
   const response = NextResponse.redirect(url);
-  response.cookies.set(OAUTH_STATE_COOKIE, "", oauthNonceCookieOptions(0));
+  response.cookies.set(
+    OAUTH_STATE_COOKIE,
+    "",
+    oauthNonceCookieOptions(0, request.url),
+  );
   return response;
 }
 

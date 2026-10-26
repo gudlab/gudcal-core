@@ -109,6 +109,8 @@ docker run -p 3000:3000 \
 
 Reuse the same `ENCRYPTION_KEY` on later `docker run` invocations. Generating a new value on each start makes stored calendar tokens unreadable.
 
+On HTTPS, set `APP_URL=https://your.domain` at runtime (for example `-e APP_URL="https://cal.example.com"`). The Google Calendar OAuth nonce cookie is `Secure` only when that runtime URL uses `https:`. `NEXT_PUBLIC_APP_URL` is inlined when the image is built, so an image built with `http://localhost:3000` cannot pick up a later HTTPS `NEXT_PUBLIC_*` value.
+
 ## MCP
 
 Point any MCP-compatible client at `https://gudcal.com/api/mcp` (Cloud **Team**) or at `/api/mcp` on your self-host.

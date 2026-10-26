@@ -35,7 +35,10 @@ export async function GET(request: Request) {
   response.cookies.set(
     OAUTH_STATE_COOKIE,
     nonce,
-    oauthNonceCookieOptions(Math.floor(OAUTH_STATE_TTL_MS / 1000)),
+    oauthNonceCookieOptions(
+      Math.floor(OAUTH_STATE_TTL_MS / 1000),
+      request.url,
+    ),
   );
   return response;
 }

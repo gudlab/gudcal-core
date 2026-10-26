@@ -164,8 +164,19 @@ export function consumeOauthState(input: {
   return { ok: true, userId: verified.payload.userId };
 }
 
-function isPublicAppUrlHttps(): boolean {
-  const raw = (process.env.NEXT_PUBLIC_APP_URL ?? process.env.APP_URL ?? "").trim();
+function firstPublicAppUrl(requestUrl?: string): string {
+  // Prefer runtime APP_URL. NEXT_PUBLIC_* is inlined at Next build time.
+  // trim() + || so empty or whitespace falls through.
+  return (
+    process.env.APP_URL?.trim() ||
+    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+    requestUrl?.trim() ||
+    ""
+  );
+}
+
+function isPublicAppUrlHttps(requestUrl?: string): boolean {
+  const raw = firstPublicAppUrl(requestUrl);
   if (!raw) {
     return false;
   }
@@ -176,10 +187,13 @@ function isPublicAppUrlHttps(): boolean {
   }
 }
 
-export function oauthNonceCookieOptions(maxAgeSeconds: number) {
+export function oauthNonceCookieOptions(
+  maxAgeSeconds: number,
+  requestUrl?: string,
+) {
   return {
     httpOnly: true,
-    secure: isPublicAppUrlHttps(),
+    secure: isPublicAppUrlHttps(requestUrl),
     sameSite: "lax" as const,
     path: "/",
     maxAge: maxAgeSeconds,
